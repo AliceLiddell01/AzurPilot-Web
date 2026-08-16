@@ -1,0 +1,18 @@
+# Результаты сборки и зависимости фронтенда
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+
+# Локальное окружение и машинно-зависимые переопределения
+.env
+.env.*
+!.env.example
+*.local
+
+# Шум редакторов и операционной системы
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
