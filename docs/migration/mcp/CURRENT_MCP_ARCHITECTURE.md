@@ -10,25 +10,25 @@ ref: personal/stable
 SHA: 3be3696975cb91ba0b85dbea98400381c3ced379
 ```
 
-Все current-state выводы ниже относятся только к этому snapshot.
+Все утверждения о текущем состоянии ниже относятся только к этому snapshot.
 
-## 2. MCP-related production files
+## 2. Файлы production MCP
 
 ### MCP-owned
 
 | Файл | Роль | Доказательство |
 | --- | --- | --- |
 | `mcp_server_sse.py` | `Server`, 17 tools, dispatch, legacy SSE/message transport, ASGI wrapper, standalone entrypoint | [pinned source](https://github.com/AliceLiddell01/AzurPilot-private-Ru/blob/3be3696975cb91ba0b85dbea98400381c3ced379/mcp_server_sse.py) |
-| `module/config/mcp_helper.py` | task metadata/i18n и Dashboard resource projection для MCP | [pinned source](https://github.com/AliceLiddell01/AzurPilot-private-Ru/blob/3be3696975cb91ba0b85dbea98400381c3ced379/module/config/mcp_helper.py) |
+| `module/config/mcp_helper.py` | метаданные задач/i18n и проекция Dashboard resources для MCP | [pinned source](https://github.com/AliceLiddell01/AzurPilot-private-Ru/blob/3be3696975cb91ba0b85dbea98400381c3ced379/module/config/mcp_helper.py) |
 
-### Wiring/dependency declarations
+### Подключение и объявления зависимостей
 
 | Файл | Роль | Доказательство |
 | --- | --- | --- |
 | `module/webui/app.py` | production mount `application.mount("/mcp", mcp_app)` | [pinned source](https://github.com/AliceLiddell01/AzurPilot-private-Ru/blob/3be3696975cb91ba0b85dbea98400381c3ced379/module/webui/app.py) |
-| `pyproject.toml` | `mcp==1.23.0`, `sse-starlette==3.0.3`, Starlette/Uvicorn constraints | [pinned source](https://github.com/AliceLiddell01/AzurPilot-private-Ru/blob/3be3696975cb91ba0b85dbea98400381c3ced379/pyproject.toml) |
+| `pyproject.toml` | `mcp==1.23.0`, `sse-starlette==3.0.3`, ограничения Starlette/Uvicorn | [pinned source](https://github.com/AliceLiddell01/AzurPilot-private-Ru/blob/3be3696975cb91ba0b85dbea98400381c3ced379/pyproject.toml) |
 
-### Общие runtime dependencies
+### Общие зависимости среды выполнения
 
 MCP adapter напрямую использует, но не владеет:
 
@@ -58,9 +58,9 @@ sse-starlette==3.0.3
 
 Актуальная опубликованная ревизия — `2026-07-28`. Она перешла к stateless protocol core и формально считает legacy HTTP+SSE transport deprecated. Текущая стабильная линия официального Python SDK — v2, тогда как v1.x оставлен в maintenance mode.
 
-Это target reference, а не описание current AzurPilot.
+Это целевой ориентир, а не описание текущего AzurPilot.
 
-## 4. Server construction и capability registration
+## 4. Создание сервера и регистрация capabilities
 
 **CURRENT FACT**
 
@@ -112,16 +112,29 @@ app = Starlette(...)
 app.mount("/", mcp_asgi_app)
 ```
 
-Пользовательский request path:
+Проверка точных зависимостей `starlette==0.49.1` и `mcp==1.23.0` показывает важную особенность вложенного mount:
+
+1. outer `Mount("/mcp")` добавляет `/mcp` в `scope.root_path` дочернего ASGI-приложения;
+2. внутренний `Mount("/")` не добавляет новый непустой префикс;
+3. `SseServerTransport.connect_sse()` вычисляет адрес POST как `scope.root_path.rstrip("/") + self._endpoint`;
+4. `self._endpoint` в AzurPilot уже равен `/mcp/messages`.
+
+Поэтому фактически endpoint event embedded SSE-session содержит **двойной префикс**:
+
+```text
+/mcp/mcp/messages?session_id=<uuid>
+```
+
+Пользовательский request path embedded режима:
 
 ```text
 MCP client
     |
-    | GET legacy SSE
+    | GET /mcp/sse
     v
 outer WebUI Starlette
     |
-    | mount /mcp
+    | mount /mcp; child root_path=/mcp
     v
 MCP Starlette wrapper
     |
@@ -129,12 +142,16 @@ MCP Starlette wrapper
     v
 SseServerTransport.connect_sse()
     |
-    | endpoint event -> /mcp/messages?session_id=<uuid>
+    | endpoint event -> /mcp/mcp/messages?session_id=<uuid>
     v
-client POST /mcp/messages?session_id=<uuid>
+client POST /mcp/mcp/messages?session_id=<uuid>
+    |
+    | outer mount /mcp
+    v
+mcp_asgi_app -> path.endswith("/messages")
     |
     v
-mcp_asgi_app -> SseServerTransport.handle_post_message()
+SseServerTransport.handle_post_message()
     |
     v
 Server.run() -> tools/call -> call_tool() -> TOOL_HANDLERS
@@ -143,14 +160,21 @@ Server.run() -> tools/call -> call_tool() -> TOOL_HANDLERS
 AzurPilot runtime/core
 ```
 
-Номинальные embedded URL families:
+Эффективные embedded URL families:
 
 ```text
 GET  /mcp/sse
-POST /mcp/messages?session_id=<uuid>
+POST /mcp/mcp/messages?session_id=<uuid>
 ```
 
-`mcp_asgi_app` использует suffix matching, а не declarative Starlette `Route` methods. Поэтому внутри достигнутого mount он проверяет окончание пути `.../sse`, `.../messages` или `.../messages/`.
+Двойной `/mcp` не делает POST недостижимым: custom `mcp_asgi_app` использует suffix matching, а не declarative Starlette `Route`, поэтому исходный путь `/mcp/mcp/messages` проходит проверку `path.endswith("/messages")`.
+
+Это **CURRENT FACT о compatibility quirk текущего transport wiring**, а не целевой URL. Следующая transport migration не должна переносить этот двойной префикс как контракт.
+
+Доказательства поведения зависимостей:
+
+- Starlette `Mount.matches()` в версии `0.49.1` накапливает `root_path` дочернего приложения;
+- `SseServerTransport` версии `1.23.0` прибавляет свой `_endpoint` к `scope.root_path` перед отправкой endpoint event.
 
 ## 6. Standalone mode
 
@@ -167,6 +191,16 @@ uvicorn.run(app, host="0.0.0.0", port=22268)
 Это не доказывает internet reachability. Router/NAT/firewall/OS ACL/Caddy конкретной машины Этап 2 не проверяет.
 
 Standalone использует ту же Starlette wrapper и тот же `SseServerTransport`; отдельной auth/security policy для standalone нет.
+
+В standalone режиме top-level `root_path` пуст, поэтому transport endpoint event не получает outer `/mcp` prefix и рекламирует:
+
+```text
+/mcp/messages?session_id=<uuid>
+```
+
+Custom suffix router принимает этот путь. SSE connect при обычном top-level вызове доступен через suffix `/sse`; код также не задаёт declarative route-level ограничение только одним абсолютным URL.
+
+Таким образом, embedded и standalone режимы имеют **разные фактические endpoint-event paths**, несмотря на общий `SseServerTransport`.
 
 ## 7. Legacy SSE session model
 
@@ -232,7 +266,7 @@ enable_dns_rebinding_protection = false
 
 Следовательно, PyWebIO password gate не является текущей защитой MCP route family.
 
-Фактическая внешняя сетeвая достижимость не устанавливается этим выводом.
+Фактическая внешняя сетевая достижимость не устанавливается этим выводом.
 
 ## 9. Input validation
 
@@ -320,7 +354,7 @@ runtime/domain error, преобразованный AzurPilot в TextContent ->
 | emulator lifecycle | `Device.emulator_stop/start()` |
 | system ADB | executable resolution + `adb kill-server/start-server` |
 
-## 13. Current architecture diagram
+## 13. Схема текущей архитектуры
 
 ```text
                           embedded mode
@@ -337,7 +371,7 @@ PyWebIO WebUI app
                                                    |
                       +----------------------------+--------------------+
                       |                                                 |
-                  */sse GET                                    */messages POST
+              /mcp/sse GET                         /mcp/mcp/messages POST
                       |                                                 |
                       +------ SseServerTransport(session UUID) ---------+
                                                    |
@@ -357,6 +391,7 @@ PyWebIO WebUI app
 
 standalone mode:
 uvicorn 0.0.0.0:22268 -> тот же MCP Starlette wrapper
+endpoint event -> /mcp/messages?session_id=<uuid>
 ```
 
 ## 14. Целевая интерпретация
