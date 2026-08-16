@@ -1,38 +1,38 @@
-# ADR-0004: MCP adapter boundary
+# ADR-0004: Граница MCP-адаптера
 
-- Status: Accepted
-- Date: 2026-08-16
+- Статус: Принято
+- Дата: 2026-08-16
 
-## Context
+## Контекст
 
-`AzurPilot-private-Ru` already contains `mcp_server_sse.py`. The current implementation uses the older SSE transport and directly reaches privileged runtime internals for process, config, device, scheduler, logs, ADB and emulator actions.
+В `AzurPilot-private-Ru` уже существует `mcp_server_sse.py`. Текущая реализация использует старый SSE-транспорт и напрямую обращается к привилегированным компонентам среды выполнения для процессов, конфигурации, устройства, планировщика, логов, ADB и операций эмулятора.
 
-The MCP specification replaced HTTP+SSE with Streamable HTTP, and the official Python SDK recommends Streamable HTTP for deployed servers.
+Спецификация MCP заменила HTTP+SSE на Streamable HTTP, а официальный Python SDK рекомендует Streamable HTTP для развёрнутых серверов.
 
-## Decision
+## Решение
 
-MCP remains in `AzurPilot-private-Ru`; it is not moved into `AzurPilot-Web`, and the frontend has no MCP SDK dependency.
+MCP остаётся в `AzurPilot-private-Ru`; его нельзя переносить в `AzurPilot-Web`, а фронтенд не получает зависимость от MCP Python SDK.
 
-The current MCP server is classified as a **legacy current-state adapter**. The target architecture is:
+Текущий MCP-сервер классифицируется как **устаревший адаптер текущего состояния**. Целевая архитектура:
 
 ```text
-MCP client -> Caddy -> /mcp -> MCP adapter -> Application/Service Layer -> AzurPilot Core
+MCP-клиент -> Caddy -> /mcp -> MCP-адаптер -> Слой приложения/сервисов -> Ядро AzurPilot
 ```
 
-Target production transport is **Streamable HTTP**. Legacy SSE may remain only as a deliberate temporary compatibility mechanism if required by real clients.
+Целевой транспорт для рабочей эксплуатации — **Streamable HTTP**. Старый SSE может временно сохраняться только как осознанный механизм совместимости, если он действительно понадобится существующим клиентам.
 
-Resources, Prompts and Tools are designed according to MCP semantics rather than modelling every capability as a Tool. Write/destructive tools require server-side permission checks, validation, audit and human-in-the-loop policy where necessary.
+Resources, Prompts и Tools проектируются по смыслу MCP, а не по принципу «всё является Tool». Изменяющие состояние и разрушительные Tools требуют серверных разрешений, валидации, аудита и участия человека там, где это необходимо.
 
-Web authentication and MCP authentication remain distinct security contracts even if they later share identity/authorization infrastructure.
+Веб-аутентификация и MCP-аутентификация остаются разными контрактами безопасности, даже если позже будут использовать общий слой идентификации/авторизации.
 
-## Consequences
+## Последствия
 
-- No new frontend dependency on the MCP Python SDK.
-- MCP business logic must migrate toward shared services before privileged capability expansion.
-- `/mcp` is published through the same protected public edge, not as an unauthenticated standalone Internet port.
-- Exact MCP auth mechanism is deferred.
+- Во фронтенде не появляется новая зависимость от MCP Python SDK.
+- Бизнес-действия MCP должны перейти к общим сервисам до расширения привилегированных возможностей.
+- `/mcp` публикуется через ту же защищённую публичную точку входа, а не как отдельный незащищённый порт в Интернет.
+- Конкретный механизм MCP-аутентификации пока отложен.
 
-## References
+## Источники
 
 - <https://modelcontextprotocol.io/specification/2025-03-26/basic/transports>
 - <https://github.com/modelcontextprotocol/python-sdk/blob/main/docs/run/index.md>

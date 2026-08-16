@@ -1,41 +1,41 @@
-# ADR-0003: Self-hosted public edge topology
+# ADR-0003: Топология публичной точки входа самостоятельно размещаемой системы
 
-- Status: Accepted
-- Date: 2026-08-16
+- Статус: Принято
+- Дата: 2026-08-16
 
-## Context
+## Контекст
 
-The intended product is a personal self-hosted control panel on the user's PC with public Internet access. Publishing AzurPilot's internal application ports directly would enlarge the trust boundary and complicate browser security.
+Целевой продукт — персональная панель управления на компьютере пользователя с доступом через Интернет. Прямая публикация внутренних портов AzurPilot увеличила бы границу доверия и усложнила бы безопасность браузерного доступа.
 
-## Decision
+## Решение
 
-Caddy is the target **single public HTTP(S) edge**.
-
-```text
-Internet -> HTTPS -> Caddy -> 127.0.0.1:<backend-port>
-```
-
-Production is same-origin:
+Caddy является целевой **единственной публичной HTTP(S)-точкой входа**.
 
 ```text
-https://<user-domain>/
-https://<user-domain>/api/v1/...
-wss://<user-domain>/...
-https://<user-domain>/mcp
+Интернет -> HTTPS -> Caddy -> 127.0.0.1:<порт-бэкенда>
 ```
 
-The backend should bind to loopback/local interface in the target deployment. Wildcard CORS is not the production default.
+Рабочая эксплуатация использует один веб-источник:
 
-A reverse-proxy TCP peer on loopback does not make the originating request a trusted local-user request. Forwarded metadata is trusted only from the configured proxy boundary, and authorization remains a backend responsibility.
+```text
+https://<домен-пользователя>/
+https://<домен-пользователя>/api/v1/...
+wss://<домен-пользователя>/...
+https://<домен-пользователя>/mcp
+```
 
-## Consequences
+В целевом развёртывании бэкенд должен слушать loopback/локальный интерфейс. Wildcard CORS не является настройкой рабочей эксплуатации по умолчанию.
 
-- Caddy owns public TLS termination/reverse proxying.
-- Direct external exposure of internal AzurPilot ports is not the target deployment.
-- Backend proxy-awareness and remote authentication are prerequisites for public deployment.
-- Caddy installation, DNS and router forwarding remain deployment work outside Stage 0.
+TCP-соединение от обратного прокси через loopback не делает исходный запрос автоматически доверенным локальным запросом пользователя. Перенаправленные метаданные доверяются только внутри заранее определённой границы прокси, а авторизация остаётся обязанностью бэкенда.
 
-## References
+## Последствия
+
+- Caddy отвечает за публичное завершение TLS и обратное проксирование.
+- Прямая внешняя публикация внутренних портов AzurPilot не является целевой моделью.
+- Поддержка доверенной прокси-границы и удалённая аутентификация являются обязательными условиями публичного развёртывания.
+- Установка Caddy, DNS и проброс портов остаются отдельной работой по развёртыванию вне Этапа 0.
+
+## Источники
 
 - <https://caddyserver.com/docs/automatic-https>
 - <https://caddyserver.com/docs/caddyfile/directives/reverse_proxy>

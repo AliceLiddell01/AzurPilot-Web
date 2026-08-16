@@ -1,31 +1,31 @@
-## Summary
+## Краткое описание
 
-<!-- What changed and why? -->
+<!-- Что изменено и зачем? -->
 
-## Scope
+## Входит в объём
 
-<!-- What is intentionally included? -->
+<!-- Что намеренно входит в этот PR? -->
 
-## Out of scope
+## Не входит в объём
 
-<!-- What is intentionally not part of this PR? -->
+<!-- Что намеренно не входит в этот PR? -->
 
-## Cross-repo impact
+## Влияние на другие репозитории
 
-<!-- None, or describe impact/dependency on AzurPilot-private-Ru. -->
+<!-- Нет, либо опишите влияние/зависимость от AzurPilot-private-Ru. -->
 
-## Architecture / security impact
+## Влияние на архитектуру и безопасность
 
-<!-- Boundaries, trust, auth, public exposure, destructive operations, schema changes, etc. -->
+<!-- Границы, доверие, аутентификация, публичная доступность, разрушительные операции, изменение схем и т. п. -->
 
-## Checks actually run
+## Фактически выполненные проверки
 
-<!-- List only commands/reviews/checks that really ran. -->
+<!-- Перечисляйте только действительно выполненные команды, ревью и проверки. -->
 
-## Manual validation
+## Ручная проверка
 
-<!-- None, or the exact acceptance performed/required. -->
+<!-- Не требуется, либо укажите точную выполненную/необходимую приёмку. -->
 
-## Known limitations
+## Известные ограничения
 
-<!-- Deferred work, environment limitations, compatibility concerns. -->
+<!-- Отложенная работа, ограничения среды, вопросы совместимости. -->

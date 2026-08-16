@@ -1,30 +1,30 @@
-# ADR-0005: Frontend artifact integration
+# ADR-0005: Интеграция артефакта фронтенда
 
-- Status: Accepted
-- Date: 2026-08-16
+- Статус: Принято
+- Дата: 2026-08-16
 
-## Context
+## Контекст
 
-AzurPilot is a Python application. Requiring a Node.js development server in production would add an unnecessary runtime dependency and make frontend/backend repository coupling harder to control.
+AzurPilot является Python-приложением. Требование сервера разработки Node.js в рабочей эксплуатации добавило бы ненужную зависимость среды выполнения и усложнило бы контроль связи между фронтенд- и бэкенд-репозиториями.
 
-Vite's production build produces a bundle suitable for static serving.
+Сборка Vite для рабочей эксплуатации формирует набор файлов, пригодный для статической раздачи.
 
-## Decision
+## Решение
 
-AzurPilot-Web builds independently and publishes a **versioned static frontend artifact**. The AzurPilot runtime integrates and serves that artifact through its Python/ASGI deployment.
+AzurPilot-Web собирается независимо и поставляет **версионированный статический артефакт фронтенда**. Среда выполнения AzurPilot интегрирует и раздаёт этот артефакт через Python/ASGI.
 
 ```text
-AzurPilot-Web -> build -> versioned dist artifact -> AzurPilot runtime integration -> Python/ASGI serving
+AzurPilot-Web -> сборка -> версионированный dist-артефакт -> интеграция в среду выполнения AzurPilot -> раздача Python/ASGI
 ```
 
-Node.js/pnpm are build-time tools only. A Git submodule/subtree is not an implicit runtime integration mechanism; adopting one would require a separate ADR and demonstrated need.
+Node.js/pnpm являются только инструментами сборки. Git submodule/subtree не используется как неявный механизм связи во время выполнения; его внедрение потребует отдельного ADR и доказанной необходимости.
 
-## Consequences
+## Последствия
 
-- Production users do not need Node.js merely to run the WebUI.
-- Artifact versioning/integrity and exact packaging are deferred until the frontend build exists.
-- Backend integration can evolve without making the two repositories a monorepo.
+- Конечному пользователю не нужен Node.js только ради запуска WebUI.
+- Версионирование/целостность артефакта и точный формат упаковки откладываются до появления реальной сборки фронтенда.
+- Интеграция с бэкендом может развиваться без превращения двух репозиториев в монорепозиторий.
 
-## Reference
+## Источник
 
 - <https://vite.dev/guide/build>

@@ -1,17 +1,17 @@
-# Frontend build/dependency output
+# Результаты сборки и зависимости фронтенда
 node_modules/
 dist/
 coverage/
 playwright-report/
 test-results/
 
-# Local environment and machine-specific overrides
+# Локальное окружение и машинно-зависимые переопределения
 .env
 .env.*
 !.env.example
 *.local
 
-# Editor / OS noise
+# Шум редакторов и операционной системы
 .DS_Store
 Thumbs.db
 .vscode/

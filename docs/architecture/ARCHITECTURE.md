@@ -1,33 +1,33 @@
-# AzurPilot-Web Architecture Baseline
+# Архитектурная основа AzurPilot-Web
 
-Status: **Accepted baseline for Stage 0**  
-Scope: repository boundary, runtime topology, API/MCP ownership, trust boundaries, and delivery model.  
-Implementation status: **target design unless explicitly marked current state**.
+Статус: **Принято как архитектурная основа Этапа 0**  
+Область: граница репозитория, топология среды выполнения, владение API/MCP, границы доверия и модель поставки.  
+Состояние реализации: **целевая архитектура, если раздел явно не помечен как текущее состояние**.
 
-## 1. Purpose
+## 1. Назначение
 
-AzurPilot-Web is the future browser client for AzurPilot. Stage 0 deliberately defines boundaries before frontend scaffolding so that UI development cannot accidentally duplicate privileged backend behavior or expose AzurPilot internals as browser concerns.
+AzurPilot-Web — будущий браузерный клиент AzurPilot. Этап 0 намеренно фиксирует границы до создания основы фронтенда, чтобы разработка интерфейса не смогла случайно продублировать привилегированное поведение бэкенда или превратить внутренности AzurPilot в заботу браузера.
 
-This document separates **current state** from **target state**. A target diagram or rule is not evidence that the corresponding implementation already exists.
+Этот документ разделяет **текущее состояние** и **целевое состояние**. Целевая диаграмма или правило не являются доказательством, что соответствующая реализация уже существует.
 
-## 2. Current state
+## 2. Текущее состояние
 
-The current WebUI lives in `AliceLiddell01/AzurPilot-private-Ru` and remains the source of truth for runtime behavior.
+Текущий WebUI находится в `AliceLiddell01/AzurPilot-private-Ru` и остаётся источником истины о фактическом поведении среды выполнения.
 
-Verified on `personal/stable@3be3696975cb91ba0b85dbea98400381c3ced379` during Stage 0:
+Проверено на `personal/stable@3be3696975cb91ba0b85dbea98400381c3ced379` во время Этапа 0:
 
-- the main WebUI is Python/PyWebIO-based and is assembled in `module/webui/app.py`;
-- `module/webui/fastapi.py` builds a Starlette ASGI application around PyWebIO and appends additional API routes;
-- `module/webui/api.py` already contains partial REST, SSE/streaming and WebSocket endpoints, including statistics, notification/launcher streams, screenshots and device-control behavior;
-- remote-access infrastructure already exists in `module/webui/remote_access.py`;
-- `module/webui/process_manager.py` directly owns worker-process lifecycle and is privileged runtime code;
-- `mcp_server_sse.py` already provides MCP over the legacy HTTP+SSE transport and is mounted by the WebUI application;
-- the legacy MCP implementation directly imports or instantiates runtime internals including `ProcessManager`, `AzurLaneConfig`, `Device`, config helpers, local logs and ADB/emulator operations;
-- some local-only behavior is gated by `module/webui/launcher.py::is_local_request()`, which reasons about the direct client host and HTTP `Host` header;
-- a complete application/service layer that cleanly mediates HTTP, WebUI and MCP business actions is **not yet established** as the shared target boundary;
-- a React frontend does **not** yet exist in this repository.
+- основной WebUI построен на Python/PyWebIO и собирается в `module/webui/app.py`;
+- `module/webui/fastapi.py` создаёт Starlette ASGI-приложение вокруг PyWebIO и добавляет дополнительные API-маршруты;
+- `module/webui/api.py` уже содержит частичные REST-, SSE/streaming- и WebSocket-маршруты, включая статистику, потоки уведомлений/лаунчера, снимки экрана и управление устройством;
+- инфраструктура удалённого доступа уже существует в `module/webui/remote_access.py`;
+- `module/webui/process_manager.py` напрямую владеет жизненным циклом рабочих процессов и является привилегированным кодом среды выполнения;
+- `mcp_server_sse.py` уже предоставляет MCP через устаревший HTTP+SSE-транспорт и монтируется текущим WebUI-приложением;
+- устаревший MCP напрямую импортирует или создаёт компоненты среды выполнения, включая `ProcessManager`, `AzurLaneConfig`, `Device`, вспомогательные объекты конфигурации, локальные логи, ADB и операции эмулятора;
+- часть поведения, доступного только локально, защищается через `module/webui/launcher.py::is_local_request()`, который анализирует прямой адрес клиента и HTTP-заголовок `Host`;
+- законченный слой приложения/сервисов, который единообразно посредничает между HTTP, WebUI и MCP, **ещё не сформирован** как общая целевая граница;
+- React-фронтенда в этом репозитории **пока нет**.
 
-Current code references:
+Ссылки на код текущего состояния:
 
 - `module/webui/app.py`: <https://github.com/AliceLiddell01/AzurPilot-private-Ru/blob/personal/stable/module/webui/app.py>
 - `module/webui/fastapi.py`: <https://github.com/AliceLiddell01/AzurPilot-private-Ru/blob/personal/stable/module/webui/fastapi.py>
@@ -36,145 +36,145 @@ Current code references:
 - `module/webui/process_manager.py`: <https://github.com/AliceLiddell01/AzurPilot-private-Ru/blob/personal/stable/module/webui/process_manager.py>
 - `mcp_server_sse.py`: <https://github.com/AliceLiddell01/AzurPilot-private-Ru/blob/personal/stable/mcp_server_sse.py>
 
-### Current-state security debt relevant to migration
+### Технический долг безопасности, важный для миграции
 
-The existing system was not designed around the final public reverse-proxy boundary described below. In particular:
+Существующая система не проектировалась вокруг финальной публичной границы обратного прокси, описанной ниже. В частности:
 
-- legacy MCP uses the superseded SSE transport and currently contains direct privileged operations;
-- the standalone legacy MCP entry point can bind to all interfaces and its Starlette wrapper currently permits wildcard CORS;
-- direct-local request checks cannot be generalized into "the TCP peer is loopback, therefore the user is trusted" after a reverse proxy is introduced;
-- existing API surface is real but is not evidence that a stable, versioned React contract is already complete.
+- устаревший MCP использует старый SSE-транспорт и сейчас содержит прямые привилегированные операции;
+- самостоятельный режим устаревшего MCP может слушать все интерфейсы, а его Starlette-обёртка сейчас разрешает wildcard CORS;
+- текущие проверки «локальности» нельзя после появления обратного прокси обобщить до правила «TCP peer равен loopback, значит пользователь доверенный»;
+- наличие текущего API не означает, что стабильный версионированный контракт для React уже завершён.
 
-These observations are migration inputs, not a request to rewrite backend code in Stage 0.
+Это входные данные для миграции, а не требование переписывать код бэкенда в Этапе 0.
 
-## 3. Target system context
+## 3. Целевой системный контекст
 
 ```mermaid
 flowchart TB
-    Internet[Internet] -->|HTTPS| Caddy[Caddy\npublic HTTPS edge]
-    Caddy --> Frontend[React WebUI\nstatic artifact]
-    Caddy --> HTTP[HTTP / realtime adapters]
-    Caddy --> MCP[MCP adapter\nStreamable HTTP]
-    Frontend -->|same-origin /api/v1 + realtime| HTTP
-    HTTP --> Services[Application / Service Layer]
+    Internet[Интернет] -->|HTTPS| Caddy[Caddy\nпубличная HTTPS-точка входа]
+    Caddy --> Frontend[React WebUI\nстатический артефакт]
+    Caddy --> HTTP[HTTP / адаптеры реального времени]
+    Caddy --> MCP[MCP-адаптер\nStreamable HTTP]
+    Frontend -->|единый веб-источник /api/v1 + realtime| HTTP
+    HTTP --> Services[Слой приложения / сервисов]
     MCP --> Services
-    LocalUI[Local UI / compatibility adapters] --> Services
-    Services --> Config[Config]
-    Services --> Scheduler[Scheduler]
-    Services --> Device[Device]
-    Services --> Core[AzurPilot Core]
+    LocalUI[Локальный UI / адаптеры совместимости] --> Services
+    Services --> Config[Конфигурация]
+    Services --> Scheduler[Планировщик]
+    Services --> Device[Устройство]
+    Services --> Core[Ядро AzurPilot]
     Device --> MuMu[MuMu]
     Scheduler --> Core
     Config --> Core
 ```
 
-The central rule is adapter convergence: browser HTTP, MCP and any local compatibility UI call the **same backend application/service capabilities** instead of each implementing its own business logic.
+Центральное правило — сходящиеся адаптеры: браузерный HTTP, MCP и любой локальный UI совместимости обращаются к **одним и тем же возможностям слоя приложения/сервисов бэкенда**, а не реализуют бизнес-логику независимо.
 
-## 4. Repository ownership
+## 4. Владение репозиториями
 
-`AzurPilot-Web` is **frontend-only**. The delivery unit is a **versioned static frontend artifact**; privileged runtime behavior stays backend-side.
+`AzurPilot-Web` является репозиторием **только фронтенда**. Единица поставки — **версионированный статический артефакт фронтенда**; привилегированное поведение среды выполнения остаётся на стороне бэкенда.
 
-### AzurPilot-Web owns
+### AzurPilot-Web владеет
 
 - React UI;
-- TypeScript frontend code;
-- frontend routing;
-- client-local state;
-- API client code;
-- design system;
-- frontend tests;
-- frontend build configuration;
-- the versioned frontend build artifact.
+- фронтенд-кодом на TypeScript;
+- фронтенд-маршрутизацией;
+- локальным клиентским состоянием;
+- API-клиентом;
+- дизайн-системой;
+- фронтенд-тестами;
+- фронтенд-сборкой;
+- версионированным артефактом фронтенд-сборки.
 
-### AzurPilot-Web does not own
+### AzurPilot-Web не владеет
 
-- AzurPilot business logic;
-- scheduler behavior;
+- бизнес-логикой AzurPilot;
+- логикой планировщика;
 - `ProcessManager`;
-- direct config-file access;
-- SQLite or other backend storage;
-- ADB or MuMu control;
-- OCR/game automation;
-- server-side authentication/authorization implementation;
-- MCP server implementation;
-- Caddy runtime management.
+- прямым доступом к config-файлам;
+- SQLite и другими хранилищами бэкенда;
+- ADB или управлением MuMu;
+- OCR/игровой автоматизацией;
+- серверной реализацией аутентификации и авторизации;
+- MCP-сервером;
+- управлением Caddy во время работы системы.
 
-### AzurPilot-private-Ru remains the target owner of
+### Целевым владельцем в AzurPilot-private-Ru остаются
 
-- application/service layer;
-- versioned HTTP API and realtime endpoints;
-- server-side authentication and authorization;
-- MCP adapter/server;
-- process/config/storage/device/MuMu integration;
-- policy enforcement for destructive operations;
-- integration and serving of the built frontend artifact inside the AzurPilot runtime.
+- слой приложения/сервисов;
+- версионированный HTTP API и маршруты реального времени;
+- серверная аутентификация и авторизация;
+- MCP-адаптер/сервер;
+- интеграция процессов, конфигурации, хранилищ, устройства и MuMu;
+- единая политика разрушительных операций;
+- интеграция и раздача собранного фронтенд-артефакта внутри среды выполнения AzurPilot.
 
-## 5. Dependency direction
+## 5. Направление зависимостей
 
-The browser may know only stable public contract concepts. It must not couple itself to Python implementation details.
+Браузер может знать только понятия стабильного публичного контракта. Он не должен связываться с деталями Python-реализации.
 
-Forbidden target dependencies include:
-
-```text
-frontend -> ProcessManager
-frontend -> config/*.json
-frontend -> SQLite file
-frontend -> MuMu process
-frontend -> Python class/module names
-```
-
-The permitted direction is:
+Запрещённые целевые зависимости:
 
 ```text
-React -> versioned backend contract -> application/service layer -> runtime internals
+фронтенд -> ProcessManager
+фронтенд -> config/*.json
+фронтенд -> SQLite-файл
+фронтенд -> процесс MuMu
+фронтенд -> имена Python-классов/модулей
 ```
 
-Likewise, the target MCP direction is:
+Разрешённое направление:
 
 ```text
-MCP protocol adapter -> application/service layer -> runtime internals
+React -> версионированный контракт бэкенда -> слой приложения/сервисов -> внутренности среды выполнения
 ```
 
-Direct MCP-to-`ProcessManager`, MCP-to-config-file, or MCP-to-`Device` implementations are legacy debt, not the target design.
+Целевое направление MCP:
 
-## 6. Application/service layer
+```text
+MCP-протокольный адаптер -> слой приложения/сервисов -> внутренности среды выполнения
+```
 
-The application/service layer is the single backend business boundary shared by all adapters.
+Прямые `MCP -> ProcessManager`, `MCP -> config-файл` или `MCP -> Device` являются устаревшим техническим долгом, а не целевой архитектурой.
 
-It must eventually express capabilities such as configuration mutation, scheduler mutation, instance lifecycle and device operations without exposing the implementation classes that perform them. The exact Python package layout is deferred to a backend Stage.
+## 6. Слой приложения/сервисов
 
-### Unified destructive-operation policy
+Слой приложения/сервисов — единая бизнес-граница бэкенда для всех адаптеров.
 
-Destructive or privileged actions must not gain adapter-specific escape hatches. Restart emulator, stop instance, config mutation, scheduler mutation, device control and future AI-triggered actions must pass through a common backend policy path that can enforce:
+Со временем он должен выражать возможности вроде изменения конфигурации, изменения планировщика, управления жизненным циклом экземпляров и операций устройства, не раскрывая наружу классы реализации. Точная структура Python-пакетов откладывается до отдельного этапа бэкенда.
 
-- authentication and authorization;
-- input validation;
-- instance/target resolution;
-- safety preconditions;
-- auditability;
-- human-in-the-loop requirements where product policy calls for them.
+### Единая политика разрушительных операций
 
-## 7. HTTP API boundary
+Разрушительные и привилегированные действия не должны получать специфичные для адаптера обходные пути. Перезапуск эмулятора, остановка экземпляра, изменение конфигурации, изменение планировщика, управление устройством и будущие AI-команды должны проходить через общий слой политик бэкенда, который способен обеспечивать:
 
-The target HTTP namespace begins at:
+- аутентификацию и авторизацию;
+- валидацию входных данных;
+- разрешение экземпляра/цели;
+- проверки безопасных предусловий;
+- аудит;
+- участие человека там, где этого требует продуктовая политика.
+
+## 7. Граница HTTP API
+
+Целевое пространство HTTP-маршрутов начинается с:
 
 ```text
 /api/v1/...
 ```
 
-Stage 0 intentionally does **not** invent the future endpoint catalogue.
+Этап 0 намеренно **не придумывает** полный каталог будущих маршрутов.
 
-Contract rules:
+Правила контракта:
 
-1. The backend is the source of truth for shared request/response schemas.
-2. Frontend request/response types must not drift as manually duplicated TypeScript definitions.
-3. A generated TypeScript client/types flow, or an equivalently verifiable schema pipeline, is the target direction; the concrete generator is deferred until the backend contract technology is selected.
-4. Breaking API changes require an explicit versioning/migration decision rather than silent schema drift.
-5. Internal Python names and storage layout are never API contract fields merely because they exist in current code.
+1. Бэкенд является источником истины для общих схем запросов и ответов.
+2. Типы запросов/ответов во фронтенде не должны бесконтрольно расходиться как вручную продублированные TypeScript-описания.
+3. Целевое направление — сгенерированные TypeScript-клиент/типы либо эквивалентная проверяемая схема; конкретный генератор откладывается до выбора технологии контракта бэкенда.
+4. Ломающие API-изменения требуют явного решения по версионированию/миграции, а не тихого дрейфа схемы.
+5. Внутренние Python-имена и структура хранилищ не становятся полями API-контракта только потому, что существуют в текущем коде.
 
-## 8. Frontend technology direction
+## 8. Направление фронтенд-стека
 
-Stage 0 records the following direction without installing dependencies:
+Этап 0 фиксирует следующее направление без установки зависимостей:
 
 ```text
 React
@@ -183,210 +183,210 @@ Vite
 React Router
 TanStack Query
 Zod
-Zustand — only for genuinely client-local state
+Zustand — только для действительно локального клиентского состояния
 Vitest
 React Testing Library
 Playwright
 ```
 
-Rationale:
+Причины:
 
-- the product is a self-hosted control-panel SPA; SSR/SEO do not justify a Next.js runtime;
-- server state should be managed as server state rather than copied into a global client store;
-- runtime payloads should be validated at the client boundary;
-- local UI state may use a small dedicated store only when URL state/component state/server state are not the right owners;
-- unit/component tests and browser-level smoke tests are both expected once the frontend exists.
+- продукт — самостоятельно размещаемая SPA-панель управления; SSR/SEO не дают оснований усложнять среду выполнения через Next.js;
+- серверное состояние должно управляться как серверное состояние, а не копироваться в глобальное клиентское хранилище;
+- данные времени выполнения необходимо валидировать на клиентской границе;
+- локальное UI-состояние может использовать небольшой отдельный store только когда состояние URL, состояние компонента и серверное состояние не подходят;
+- после появления фронтенда ожидаются модульные/компонентные тесты и браузерные smoke-тесты.
 
-As of the Stage 0 research snapshot, React 19.2 is the current React 19 release line and Vite 8 is the current Vite major. Exact package versions belong in the future lockfile, not in this architecture baseline.
+На момент исследовательского среза Этапа 0 React 19.2 является текущей линией React 19, а Vite 8 — текущей основной веткой Vite. Точные версии пакетов должны жить в будущем lockfile, а не в архитектурной основе.
 
-Primary references:
+Первичные источники:
 
 - React 19.2: <https://react.dev/blog/2025/10/01/react-19-2>
 - Vite 8: <https://vite.dev/blog/announcing-vite8>
-- Vite production build: <https://vite.dev/guide/build>
+- Сборка Vite для рабочей эксплуатации: <https://vite.dev/guide/build>
 
-## 9. Production frontend artifact model
+## 9. Модель артефакта фронтенда для рабочей эксплуатации
 
-Node.js and pnpm are build-time tools. They are not required runtime dependencies for an end user running AzurPilot.
-
-```mermaid
-flowchart LR
-    WebRepo[AzurPilot-Web] --> Build[Frontend build]
-    Build --> Artifact[Versioned dist artifact]
-    Artifact --> Integration[AzurPilot runtime integration]
-    Integration --> ASGI[Python / ASGI serves frontend]
-```
-
-The integration mechanism must be explicit and versioned. A Git submodule or subtree must not become an implicit runtime coupling between the repositories without a separate ADR proving why it is necessary.
-
-## 10. Self-hosted production topology
-
-The deployment target is a personal self-hosted control panel on the user's own PC, not SaaS.
-
-```text
-https://<user-domain>/
-https://<user-domain>/api/v1/...
-wss://<user-domain>/...
-https://<user-domain>/mcp
-```
+Node.js и pnpm — инструменты времени сборки. Они не являются обязательными зависимостями среды выполнения конечного пользователя AzurPilot.
 
 ```mermaid
 flowchart LR
-    Client[Browser / MCP client] -->|Internet HTTPS| Edge[Caddy]
-    Edge -->|loopback/private host| Backend[AzurPilot ASGI backend\n127.0.0.1:<backend-port>]
-    Backend --> Static[Frontend static artifact]
-    Backend --> Services[Application / Service Layer]
+    WebRepo[AzurPilot-Web] --> Build[Сборка фронтенда]
+    Build --> Artifact[Версионированный dist-артефакт]
+    Artifact --> Integration[Интеграция в среду выполнения AzurPilot]
+    Integration --> ASGI[Python / ASGI раздаёт фронтенд]
 ```
 
-Caddy is the **only intended public HTTP(S) edge**. The AzurPilot backend should target a loopback/local bind such as `127.0.0.1:<backend-port>` and must not require exposing an internal application port directly to the Internet.
+Механизм интеграции должен быть явным и версионированным. Git submodule или subtree не должен становиться неявной связью между репозиториями во время выполнения без отдельного ADR с доказанной необходимостью.
 
-Caddy is chosen as the target TLS/reverse-proxy edge because it supports automatic HTTPS for correctly configured public hostnames and first-class reverse proxying. Installation, DNS, port forwarding and machine-specific configuration are out of Stage 0 scope.
+## 10. Топология самостоятельно размещаемой рабочей системы
 
-Primary references:
-
-- Caddy Automatic HTTPS: <https://caddyserver.com/docs/automatic-https>
-- Caddy `reverse_proxy`: <https://caddyserver.com/docs/caddyfile/directives/reverse_proxy>
-
-## 11. Same-origin production rule
-
-Browser production traffic is same-origin by default. The public edge routes UI, `/api/v1/...` and realtime paths under the same origin.
-
-Wildcard CORS is **not** the production security model. Development may later use a Vite proxy or intentionally narrow development origins, but development convenience must not redefine production trust.
-
-## 12. Trust boundary and reverse proxy rules
-
-A reverse proxy changes what the backend observes as its direct TCP peer. Therefore:
-
-> A request arriving from a loopback proxy connection is not automatically a trusted local-user request.
-
-The future backend must:
-
-- distinguish a true direct-local request from an authenticated remote request;
-- define which proxy peers are trusted;
-- honor forwarded metadata only across that trusted proxy boundary;
-- reject or ignore spoofable forwarding headers received outside that boundary;
-- perform authorization in backend code regardless of frontend behavior.
-
-The current `is_local_request()` behavior is a current-state implementation detail and must be revisited during backend proxy/auth migration; Stage 0 does not replace it.
-
-## 13. Authentication contracts
-
-Web/browser authentication and MCP authentication are separate security contracts.
-
-They may later share an identity provider or authorization core, but a browser session cookie must not be assumed to be a universal MCP credential. Each adapter needs an explicit credential transport, authorization model, CSRF/origin considerations where applicable, revocation/expiry behavior and audit semantics.
-
-The exact auth technology is deferred because choosing it before the public API/service boundary is implemented would be premature.
-
-## 14. MCP boundary
-
-### Current state
-
-`mcp_server_sse.py` is a real legacy MCP adapter in the backend/core repository. It currently:
-
-- uses `SseServerTransport`;
-- exposes tools that directly reach `ProcessManager`, `AzurLaneConfig`, `Device`, scheduler/config state, logs, ADB and emulator operations;
-- is mounted under the existing WebUI ASGI application;
-- also contains a standalone server path.
-
-### Target state
-
-MCP stays in `AzurPilot-private-Ru`; `AzurPilot-Web` has no dependency on the MCP Python SDK.
+Целевое развёртывание — персональная панель управления на компьютере пользователя, а не SaaS.
 
 ```text
-MCP client -> Caddy -> /mcp -> MCP adapter -> application/service layer -> AzurPilot runtime
+https://<домен-пользователя>/
+https://<домен-пользователя>/api/v1/...
+wss://<домен-пользователя>/...
+https://<домен-пользователя>/mcp
 ```
 
-Target transport: **Streamable HTTP**. The MCP specification states that Streamable HTTP replaced the old HTTP+SSE transport, and the official Python SDK recommends Streamable HTTP for deployed servers. Legacy SSE may exist only as a temporary compatibility concern when proven necessary.
+```mermaid
+flowchart LR
+    Client[Браузер / MCP-клиент] -->|Интернет HTTPS| Edge[Caddy]
+    Edge -->|loopback / локальный адрес| Backend[Бэкенд AzurPilot ASGI\n127.0.0.1:<порт-бэкенда>]
+    Backend --> Static[Статический артефакт фронтенда]
+    Backend --> Services[Слой приложения / сервисов]
+```
 
-MCP capabilities should be modelled by their protocol purpose rather than putting everything into tools:
+Caddy — **единственная целевая публичная HTTP(S)-точка входа**. Бэкенд AzurPilot должен в целевой схеме слушать loopback/локальный адрес, например `127.0.0.1:<порт-бэкенда>`, и не требовать прямой публикации внутреннего порта приложения в Интернет.
 
-- **Resources**: readable context/data exposed as resources when that semantic fits;
-- **Prompts**: reusable prompt templates/workflows when useful;
-- **Tools**: callable operations, especially actions with parameters or side effects.
+Caddy выбран как целевая точка завершения TLS и обратного проксирования, потому что поддерживает автоматический HTTPS для корректно настроенных публичных имён и полноценный reverse proxy. Установка, DNS, проброс портов и машинно-зависимая конфигурация не входят в Этап 0.
 
-Write/destructive MCP tools require backend permissions, validation, audit controls and human-in-the-loop policy where necessary. `/mcp` must not be published as a separate unauthenticated raw backend port.
+Первичные источники:
 
-Primary references:
+- Automatic HTTPS Caddy: <https://caddyserver.com/docs/automatic-https>
+- `reverse_proxy` Caddy: <https://caddyserver.com/docs/caddyfile/directives/reverse_proxy>
 
-- MCP transport specification: <https://modelcontextprotocol.io/specification/2025-03-26/basic/transports>
-- Official Python SDK server transport guidance: <https://github.com/modelcontextprotocol/python-sdk/blob/main/docs/run/index.md>
-- Official Python SDK ASGI integration guidance: <https://github.com/modelcontextprotocol/python-sdk/blob/main/docs/run/asgi.md>
+## 11. Правило единого веб-источника для рабочей эксплуатации
 
-## 15. Instance model
+Браузерный трафик рабочей эксплуатации по умолчанию работает через один origin. Публичная точка входа маршрутизирует UI, `/api/v1/...` и пути реального времени внутри одного origin.
 
-The initial deployment may be one PC and one user, but the contract must not permanently encode "the only instance is localhost".
+Wildcard CORS **не является** моделью безопасности рабочей эксплуатации. Среда разработки позже может использовать Vite proxy или намеренно ограниченные origins разработки, но удобство разработки не должно переопределять границу доверия рабочей системы.
 
-Identifiers and service methods should permit explicit instance/target addressing where the domain requires it. This is not permission to design a cloud multi-tenant SaaS platform; it only avoids an unnecessary single-instance trap in the public contract.
+## 12. Граница доверия и правила обратного прокси
 
-## 16. Migration constraints
+Обратный прокси меняет то, кого бэкенд видит как прямого TCP peer. Поэтому:
 
-Future Stages must preserve these constraints:
+> Запрос, пришедший по loopback-соединению от обратного прокси, не становится автоматически доверенным локальным запросом пользователя.
 
-1. Introduce/refine backend application services before exposing new privileged actions to React or MCP.
-2. Do not migrate PyWebIO behavior by copying direct runtime calls into TypeScript.
-3. Do not treat the current unversioned/legacy API as automatically fit for the React contract.
-4. Move browser-facing endpoints toward `/api/v1/...` with backend-owned schemas.
-5. Integrate the built frontend as an artifact, not by requiring a Node development server in production.
-6. Introduce trusted-proxy and remote-auth semantics before public Caddy exposure.
-7. Migrate MCP business actions to shared services before expanding privileged AI control.
-8. Preserve a compatibility path only when there is a demonstrated user/runtime requirement.
+Будущий бэкенд обязан:
 
-Examples of likely backend prerequisites, to be delivered in later backend work rather than Stage 0:
+- отличать настоящий прямой локальный запрос от аутентифицированного удалённого запроса;
+- явно определять доверенные прокси;
+- учитывать перенаправленные метаданные только внутри доверенной прокси-границы;
+- отвергать или игнорировать подделываемые заголовки перенаправления вне этой границы;
+- выполнять авторизацию на стороне бэкенда независимо от поведения фронтенда.
+
+Текущий `is_local_request()` — деталь текущей реализации, которую необходимо пересмотреть во время миграции бэкенда к прокси/аутентификации; Этап 0 её не заменяет.
+
+## 13. Контракты аутентификации
+
+Веб-аутентификация и MCP-аутентификация являются разными контрактами безопасности.
+
+Позже они могут использовать общий поставщик идентификации или общий слой авторизации, но cookie браузерной сессии нельзя автоматически считать универсальным MCP-учётным данным. Каждому адаптеру нужен явный способ передачи учётных данных, модель авторизации, правила CSRF/origin там, где они применимы, отзыв/срок действия и семантика аудита.
+
+Конкретная технология аутентификации откладывается: фиксировать её до реализации публичного API и сервисной границы преждевременно.
+
+## 14. Граница MCP
+
+### Текущее состояние
+
+`mcp_server_sse.py` — реальный устаревший MCP-адаптер в репозитории бэкенда/ядра. Сейчас он:
+
+- использует `SseServerTransport`;
+- содержит Tools, которые напрямую обращаются к `ProcessManager`, `AzurLaneConfig`, `Device`, состоянию планировщика/конфигурации, логам, ADB и операциям эмулятора;
+- монтируется внутри существующего WebUI ASGI-приложения;
+- также содержит самостоятельный серверный режим.
+
+### Целевое состояние
+
+MCP остаётся в `AzurPilot-private-Ru`; `AzurPilot-Web` не зависит от MCP Python SDK.
 
 ```text
-Future backend prerequisite: introduce a ConfigService boundary before exposing config mutation through /api/v1 and MCP.
-Future backend prerequisite: introduce an InstanceLifecycleService boundary before React/MCP control start/stop/restart actions.
-Future backend prerequisite: define trusted-proxy and authenticated-remote request semantics before Caddy-backed public access.
+MCP-клиент -> Caddy -> /mcp -> MCP-адаптер -> слой приложения/сервисов -> среда выполнения AzurPilot
 ```
 
-## 17. Explicit non-goals
+Целевой транспорт: **Streamable HTTP**. Спецификация MCP указывает, что Streamable HTTP заменил старый HTTP+SSE-транспорт, а официальный Python SDK рекомендует Streamable HTTP для развёрнутых серверов. Старый SSE может оставаться только как временная задача совместимости при доказанной необходимости.
 
-Stage 0 does not choose or implement:
+Возможности MCP следует моделировать по смыслу протокола, а не складывать всё в Tools:
 
-- a SaaS or multi-tenant cloud architecture;
-- Kubernetes or microservices;
-- a separate VPS requirement;
-- Next.js/SSR for its own sake;
-- a database migration;
-- Caddy machine configuration;
-- router/DNS setup;
-- concrete browser or MCP auth technology;
-- a full API endpoint catalogue;
-- an API type generator;
-- React scaffolding, package versions or a lockfile;
-- backend refactors;
-- a new MCP server;
-- a deployment/release pipeline.
+- **Resources** — читаемый контекст/данные, если это соответствует их смыслу;
+- **Prompts** — переиспользуемые шаблоны/сценарии запросов, где это полезно;
+- **Tools** — вызываемые операции, особенно действия с параметрами или побочными эффектами.
 
-## 18. Deferred decisions
+Изменяющие состояние и разрушительные MCP Tools требуют серверных разрешений, валидации, аудита и участия человека там, где это необходимо. `/mcp` не должен публиковаться как отдельный неаутентифицированный порт бэкенда.
 
-The following are intentionally deferred until there is enough implementation evidence:
+Первичные источники:
 
-| Decision | Why deferred |
+- спецификация транспорта MCP: <https://modelcontextprotocol.io/specification/2025-03-26/basic/transports>
+- руководство официального Python SDK по серверному транспорту: <https://github.com/modelcontextprotocol/python-sdk/blob/main/docs/run/index.md>
+- руководство официального Python SDK по интеграции ASGI: <https://github.com/modelcontextprotocol/python-sdk/blob/main/docs/run/asgi.md>
+
+## 15. Модель экземпляров
+
+Начальное развёртывание может состоять из одного компьютера и одного пользователя, но контракт не должен навсегда кодировать правило «единственный экземпляр — это localhost».
+
+Идентификаторы и методы сервисов должны позволять явное указание экземпляра/цели там, где этого требует предметная модель. Это не разрешение проектировать облачный multi-tenant SaaS; задача только в том, чтобы не зашить ненужное ограничение на один экземпляр в публичный контракт.
+
+## 16. Ограничения миграции
+
+Будущие Этапы обязаны сохранять следующие ограничения:
+
+1. Вводить или уточнять сервисы приложения на стороне бэкенда до публикации новых привилегированных действий через React или MCP.
+2. Не переносить PyWebIO-поведение путём копирования прямых вызовов среды выполнения в TypeScript.
+3. Не считать текущий неверсионированный/устаревший API автоматически пригодным для React-контракта.
+4. Переводить браузерные маршруты в `/api/v1/...` со схемами, которыми владеет бэкенд.
+5. Интегрировать собранный фронтенд как артефакт, а не требовать сервер разработки Node в рабочей эксплуатации.
+6. Ввести семантику доверенного прокси и удалённой аутентификации до публичного доступа через Caddy.
+7. Перенести бизнес-действия MCP на общие сервисы до расширения привилегированного AI-управления.
+8. Сохранять путь совместимости только при доказанной пользовательской необходимости или необходимости среды выполнения.
+
+Примеры вероятных предпосылок бэкенда, которые должны выполняться в будущих этапах бэкенда, а не в Этапе 0:
+
+```text
+Будущая предпосылка бэкенда: ввести границу ConfigService до публикации изменения конфигурации через /api/v1 и MCP.
+Будущая предпосылка бэкенда: ввести границу InstanceLifecycleService до управления start/stop/restart через React/MCP.
+Будущая предпосылка бэкенда: определить семантику доверенного прокси и аутентифицированного удалённого запроса до публичного доступа через Caddy.
+```
+
+## 17. Явные нецели
+
+Этап 0 не выбирает и не реализует:
+
+- SaaS или облачную multi-tenant архитектуру;
+- Kubernetes или микросервисы;
+- обязательный отдельный VPS;
+- Next.js/SSR «ради современности»;
+- миграцию базы данных;
+- машинную конфигурацию Caddy;
+- настройку роутера/DNS;
+- конкретную технологию браузерной или MCP-аутентификации;
+- полный каталог API-маршрутов;
+- генератор API-типов;
+- React scaffold, точные версии пакетов или lockfile;
+- рефакторинги бэкенда;
+- новый MCP-сервер;
+- конвейер развёртывания/релизов.
+
+## 18. Отложенные решения
+
+Следующие решения намеренно отложены до появления достаточных данных реализации:
+
+| Решение | Почему отложено |
 | --- | --- |
-| Backend schema/OpenAPI source technology and TypeScript generator | Must align with the actual backend contract implementation, not speculation. |
-| Browser auth mechanism | Depends on deployment/auth requirements and backend threat model. |
-| MCP auth mechanism | Separate protocol/security contract; should align with supported MCP clients and backend authorization. |
-| Realtime transport/path details | Must be driven by concrete UI use cases and existing backend behavior. |
-| Frontend artifact versioning/packaging format | Requires Stage 1 build output and backend integration constraints. |
-| Compatibility lifetime for legacy PyWebIO/MCP SSE | Requires migration rollout evidence. |
-| Exact frontend package versions | Belongs in the scaffold lockfile. |
+| Технология схемы бэкенда/OpenAPI и генератор TypeScript | Должны соответствовать реальной реализации контракта бэкенда, а не предположениям. |
+| Механизм браузерной аутентификации | Зависит от требований развёртывания и модели угроз бэкенда. |
+| Механизм MCP-аутентификации | Отдельный протокольный контракт безопасности; должен учитывать поддерживаемые MCP-клиенты и авторизацию бэкенда. |
+| Детали транспорта/пути реального времени | Должны вытекать из конкретных UI-сценариев и существующего поведения бэкенда. |
+| Версионирование/формат фронтенд-артефакта | Требует реального результата сборки следующего этапа и ограничений интеграции с бэкендом. |
+| Срок совместимости старых PyWebIO/MCP SSE | Требует данных реальной миграции. |
+| Точные версии фронтенд-пакетов | Должны находиться в lockfile после создания основы приложения. |
 
-## 19. Architecture acceptance test
+## 19. Проверка архитектурной однозначности
 
-A future contributor should be able to answer these questions from this baseline without guessing:
+После чтения этой основы будущий разработчик должен отвечать на следующие вопросы без догадок:
 
-| Question | Baseline answer |
+| Вопрос | Ответ |
 | --- | --- |
-| Who owns the frontend? | `AzurPilot-Web`. |
-| Who owns API/server auth/runtime integration? | `AzurPilot-private-Ru`. |
-| Where does MCP live? | `AzurPilot-private-Ru`. |
-| Where does business logic live? | Behind the backend application/service layer. |
-| May React read config files or SQLite directly? | No. |
-| May target MCP tools call `ProcessManager` directly? | No; they call the shared service boundary. |
-| Who owns shared API schemas? | Backend is source of truth. |
-| How does frontend reach production? | As a versioned static build artifact integrated into AzurPilot runtime. |
-| What is the public edge? | Caddy over HTTPS. |
-| Does a loopback reverse-proxy peer imply local-user trust? | No. |
-| Is current backend API already the final React API? | No. |
-| Is the auth technology decided? | No; separation and backend enforcement are decided, exact mechanism is deferred. |
+| Кто владеет фронтендом? | `AzurPilot-Web`. |
+| Кто владеет API, серверной аутентификацией и интеграцией среды выполнения? | `AzurPilot-private-Ru`. |
+| Где живёт MCP? | В `AzurPilot-private-Ru`. |
+| Где живёт бизнес-логика? | За слоем приложения/сервисов бэкенда. |
+| Может ли React читать config-файлы или SQLite напрямую? | Нет. |
+| Может ли целевой MCP напрямую вызывать `ProcessManager`? | Нет; он обращается к общей сервисной границе. |
+| Кто владеет общими схемами API? | Бэкенд является источником истины. |
+| Как фронтенд попадает в рабочую эксплуатацию? | Как версионированный статический артефакт, интегрируемый в среду выполнения AzurPilot. |
+| Что является публичной точкой входа? | Caddy через HTTPS. |
+| Означает ли loopback peer обратного прокси доверенного локального пользователя? | Нет. |
+| Является ли текущий API бэкенда готовым финальным React API? | Нет. |
+| Выбрана ли конкретная технология аутентификации? | Нет; разделение контрактов и серверное применение авторизации уже зафиксированы, точный механизм отложен. |

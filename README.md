@@ -1,40 +1,40 @@
 # AzurPilot-Web
 
-AzurPilot-Web is the future browser frontend for [AzurPilot](https://github.com/AliceLiddell01/AzurPilot-private-Ru). It is intentionally a **frontend-only** repository: UI code may consume a public, versioned backend contract, but privileged AzurPilot runtime logic remains in the backend/core repository.
+AzurPilot-Web — будущий браузерный фронтенд для [AzurPilot](https://github.com/AliceLiddell01/AzurPilot-private-Ru). Репозиторий намеренно является **только фронтендом**: интерфейс может работать с публичным версионированным контрактом бэкенда, но привилегированная логика выполнения AzurPilot остаётся в репозитории бэкенда/ядра.
 
-## Project status
+## Состояние проекта
 
-**Stage 0 — architecture baseline.** The production React application does not exist yet. This repository currently defines the system boundary, delivery model, and contribution rules that future frontend work must follow before a React/Vite foundation is added.
+**Этап 0 — архитектурная основа.** Рабочего React-приложения для рабочей эксплуатации пока нет. На этом этапе репозиторий фиксирует системные границы, модель поставки и правила совместной разработки, которым должны следовать будущие этапы до создания основы React/Vite.
 
-The target direction is a self-hosted control panel served from the user's AzurPilot machine:
-
-```text
-Internet -> HTTPS -> Caddy -> AzurPilot backend
-                            |-> static frontend artifact
-                            |-> /api/v1/...
-                            |-> realtime endpoints
-                            `-> /mcp
-```
-
-The backend, not the browser, owns authentication/authorization, process control, configuration/storage access, device/MuMu interaction, scheduler operations, and MCP implementation.
-
-## Architecture
-
-Start with [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md). Accepted architectural decisions are indexed in [docs/architecture/DECISIONS.md](docs/architecture/DECISIONS.md).
-
-Key invariant:
+Целевое направление — персональная самостоятельно размещаемая панель управления, работающая на компьютере пользователя вместе с AzurPilot:
 
 ```text
-AzurPilot-Web = frontend client
-AzurPilot-private-Ru = backend/core owner
-HTTP API + MCP = adapters
-Application/Service Layer = single business boundary
-Caddy = public HTTPS edge
-AzurPilot internal runtime = never a frontend concern
+Интернет -> HTTPS -> Caddy -> бэкенд AzurPilot
+                              |-> статический артефакт фронтенда
+                              |-> /api/v1/...
+                              |-> маршруты реального времени
+                              `-> /mcp
 ```
 
-## Development workflow
+Бэкенд, а не браузер, отвечает за аутентификацию и авторизацию, управление процессами, доступ к конфигурации и хранилищам, взаимодействие с устройством/MuMu, операции планировщика и реализацию MCP.
 
-Development follows Issue -> short-lived topic branch -> Draft PR -> checks/review -> merge. See [CONTRIBUTING.md](CONTRIBUTING.md).
+## Архитектура
 
-Do not commit real deployment IPs, domains, credentials, cookies, tokens, device identifiers, private keys, or `.env` contents to this public repository. Documentation uses placeholders such as `<user-domain>` and `127.0.0.1:<backend-port>`.
+Начните с [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md). Принятые архитектурные решения собраны в [docs/architecture/DECISIONS.md](docs/architecture/DECISIONS.md).
+
+Главный инвариант:
+
+```text
+AzurPilot-Web = клиентский фронтенд
+AzurPilot-private-Ru = владелец бэкенда и ядра
+HTTP API + MCP = адаптеры
+Слой приложения/сервисов = единая бизнес-граница
+Caddy = публичная HTTPS-точка входа
+Внутренняя среда выполнения AzurPilot = никогда не забота фронтенда
+```
+
+## Процесс разработки
+
+Разработка идёт по схеме: задача GitHub -> короткоживущая тематическая ветка -> черновик PR -> проверки/ревью -> слияние. Подробности находятся в [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Не добавляйте в этот публичный репозиторий реальные IP-адреса развёртывания, домены, учётные данные, файлы cookie, токены, идентификаторы устройств, приватные ключи или содержимое `.env`. В документации используются заполнители вроде `<домен-пользователя>` и `127.0.0.1:<порт-бэкенда>`.

@@ -1,13 +1,13 @@
-# Architecture Decision Records
+# Реестр архитектурных решений
 
-Accepted Stage 0 decisions:
+Принятые решения Этапа 0:
 
-| ADR | Decision | Status |
+| ADR | Решение | Статус |
 | --- | --- | --- |
-| [ADR-0001](adr/0001-frontend-repository-boundary.md) | Keep AzurPilot-Web frontend-only | Accepted |
-| [ADR-0002](adr/0002-shared-application-service-layer.md) | Converge UI/HTTP/MCP on one backend application/service layer | Accepted |
-| [ADR-0003](adr/0003-self-hosted-edge-topology.md) | Use same-origin Caddy edge with loopback backend | Accepted |
-| [ADR-0004](adr/0004-mcp-adapter-boundary.md) | Keep MCP backend-side and migrate target transport to Streamable HTTP | Accepted |
-| [ADR-0005](adr/0005-frontend-artifact-integration.md) | Ship the frontend as a versioned static build artifact | Accepted |
+| [ADR-0001](adr/0001-frontend-repository-boundary.md) | Оставить AzurPilot-Web репозиторием только фронтенда | Принято |
+| [ADR-0002](adr/0002-shared-application-service-layer.md) | Свести UI/HTTP/MCP к единому слою приложения/сервисов бэкенда | Принято |
+| [ADR-0003](adr/0003-self-hosted-edge-topology.md) | Использовать топологию единого веб-источника через Caddy и локальный бэкенд | Принято |
+| [ADR-0004](adr/0004-mcp-adapter-boundary.md) | Оставить MCP на стороне бэкенда и перейти в целевой архитектуре на Streamable HTTP | Принято |
+| [ADR-0005](adr/0005-frontend-artifact-integration.md) | Поставлять фронтенд как версионированный статический артефакт сборки | Принято |
 
-ADRs record architectural constraints, not proof that target implementation already exists. Implementation status is tracked separately in the relevant Stage/Issue/PR.
+ADR фиксируют архитектурные ограничения, а не доказывают, что целевая реализация уже существует. Реальное состояние реализации отслеживается в соответствующих Этапах, задачах и PR.

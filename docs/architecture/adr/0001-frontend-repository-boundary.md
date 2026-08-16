@@ -1,25 +1,25 @@
-# ADR-0001: Frontend repository boundary
+# ADR-0001: Граница фронтенд-репозитория
 
-- Status: Accepted
-- Date: 2026-08-16
+- Статус: Принято
+- Дата: 2026-08-16
 
-## Context
+## Контекст
 
-AzurPilot already owns privileged Python runtime behavior: process lifecycle, config/storage access, device and emulator control, scheduler logic, authentication concerns and MCP. A new React repository creates a risk of duplicating these responsibilities merely because browser UI work is now separated physically.
+AzurPilot уже содержит привилегированную Python-логику среды выполнения: жизненный цикл процессов, доступ к конфигурации и хранилищам, управление устройством и эмулятором, планировщик, серверные вопросы аутентификации и MCP. Появление отдельного React-репозитория создаёт риск продублировать эти обязанности только из-за физического разделения браузерного интерфейса.
 
-## Decision
+## Решение
 
-`AzurPilot-Web` is a **frontend-only** repository.
+`AzurPilot-Web` является репозиторием **только фронтенда**.
 
-It owns browser UI, TypeScript, frontend routing/state, API client, design system, frontend tests/build and the frontend release artifact.
+Он владеет браузерным интерфейсом, TypeScript-кодом, клиентской маршрутизацией и состоянием, API-клиентом, дизайн-системой, фронтенд-тестами, сборкой и итоговым фронтенд-артефактом.
 
-It does not own AzurPilot business logic, `ProcessManager`, config/storage access, ADB/MuMu/OCR/game automation, server-side auth, MCP implementation or Caddy runtime management.
+Он не владеет бизнес-логикой AzurPilot, `ProcessManager`, прямым доступом к конфигурации/хранилищам, ADB/MuMu/OCR/игровой автоматизацией, серверной аутентификацией и авторизацией, реализацией MCP или управлением Caddy.
 
-The backend/core repository, `AzurPilot-private-Ru`, remains the owner of privileged runtime integrations and server-side adapters.
+Репозиторий бэкенда/ядра `AzurPilot-private-Ru` остаётся владельцем привилегированных интеграций среды выполнения и серверных адаптеров.
 
-## Consequences
+## Последствия
 
-- React depends on a versioned public backend contract, never Python implementation classes or local files.
-- Cross-repo features may require coordinated PRs, but each repository keeps a clear responsibility boundary.
-- Backend prerequisites are implemented in backend Stages rather than smuggled into the frontend repository.
-- A monorepo is not required for the current self-hosted product.
+- React зависит от публичного версионированного контракта бэкенда, а не от Python-классов реализации или локальных файлов.
+- Межрепозиторные функции могут требовать согласованных PR, но ответственность каждого репозитория остаётся однозначной.
+- Необходимые предпосылки бэкенда реализуются в отдельных этапах бэкенда, а не протаскиваются скрытно во фронтенд-репозиторий.
+- Для текущего самостоятельно размещаемого продукта монорепозиторий не требуется.

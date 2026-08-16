@@ -1,29 +1,29 @@
-# ADR-0002: Shared application/service layer
+# ADR-0002: Единый слой приложения/сервисов
 
-- Status: Accepted
-- Date: 2026-08-16
+- Статус: Принято
+- Дата: 2026-08-16
 
-## Context
+## Контекст
 
-Current WebUI and legacy MCP code can reach runtime internals directly. If React HTTP endpoints and future MCP tools independently reproduce these actions, AzurPilot would have multiple business implementations with inconsistent validation, authorization and safety behavior.
+Текущие WebUI и устаревший MCP могут напрямую обращаться к внутренним компонентам среды выполнения. Если HTTP-маршруты React и будущие MCP-инструменты независимо повторят те же действия, у AzurPilot появятся несколько бизнес-реализаций с разной валидацией, авторизацией и безопасностью.
 
-## Decision
+## Решение
 
-HTTP/UI, MCP and local compatibility adapters converge on one backend **application/service layer**.
+HTTP/UI, MCP и локальные адаптеры совместимости сходятся в одном **слое приложения/сервисов бэкенда**.
 
 ```text
-React/HTTP ----+
-               |
-MCP -----------+----> Application/Service Layer ----> AzurPilot Core
-               |
-Local UI ------+
+React/HTTP --------+
+                   |
+MCP ---------------+----> Слой приложения/сервисов ----> Ядро AzurPilot
+                   |
+Локальный UI ------+
 ```
 
-Adapters translate transport/protocol concerns. Services own use-case orchestration and call runtime internals. Destructive actions share a backend policy path for authorization, validation, audit and safety requirements.
+Адаптеры отвечают за транспорт и протокол. Сервисы отвечают за выполнение пользовательских сценариев и обращаются к внутренним компонентам среды выполнения. Разрушительные действия проходят через общий путь политики бэкенда с авторизацией, валидацией, аудитом и требованиями безопасности.
 
-## Consequences
+## Последствия
 
-- Target MCP tools must not directly call `ProcessManager`, `AzurLaneConfig`, `Device` or storage primitives.
-- React must not reimplement scheduler/config/process behavior.
-- Backend service boundaries may need to be introduced incrementally before equivalent React/MCP actions are exposed.
-- Service package/class naming is deferred to backend implementation work.
+- Целевые MCP-инструменты не должны напрямую вызывать `ProcessManager`, `AzurLaneConfig`, `Device` или примитивы хранилищ.
+- React не должен повторно реализовывать поведение планировщика, конфигурации и процессов.
+- Сервисные границы бэкенда могут вводиться постепенно до публикации эквивалентных действий в React/MCP.
+- Точные имена Python-пакетов и классов откладываются до реализации на стороне бэкенда.

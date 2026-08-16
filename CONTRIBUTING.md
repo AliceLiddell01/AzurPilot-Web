@@ -1,80 +1,80 @@
-# Contributing
+# Правила совместной разработки
 
-AzurPilot-Web uses a small trunk-based workflow. `main` is the stable integration line, not a scratch branch.
+AzurPilot-Web использует компактный процесс разработки от основной ветки. `main` — стабильная интеграционная линия, а не черновая ветка.
 
-## Workflow
+## Рабочий процесс
 
-1. Create or reference an Issue/Stage with a clear scope and Definition of Done.
-2. Branch from current `main` using a short-lived topic branch.
-3. Open a Draft PR after the first meaningful commit.
-4. Run the checks appropriate to the change and record only checks that were actually executed.
-5. Resolve actionable review findings and update the PR description to match the final diff.
-6. Merge only after acceptance; squash is the default for ordinary Stage/feature PRs.
-7. Delete the topic branch after merge.
+1. Создать или указать существующую задачу/Этап с понятным объёмом и критериями готовности.
+2. Создать короткоживущую тематическую ветку от актуального `main`.
+3. После первого содержательного коммита открыть PR как черновик.
+4. Выполнить проверки, соответствующие изменению, и перечислить только реально выполненные проверки.
+5. Исправить подтверждённые замечания ревью и привести описание PR в соответствие итоговым изменениям.
+6. Сливать только после приёмки; для обычных Этапов и функций по умолчанию использовать squash.
+7. После слияния удалить тематическую ветку.
 
-Do not create a permanent `develop`, `development` or `staging` branch without a separate demonstrated need.
+Не создавайте постоянные `develop`, `development`, `staging` или аналогичные ветки без отдельной доказанной необходимости.
 
-## Branch names
+## Имена веток
 
-Use a clear prefix:
-
-```text
-feat/<topic>
-fix/<topic>
-docs/<topic>
-chore/<topic>
-refactor/<topic>
-```
-
-## Commits
-
-Use concise Conventional-Commit-style messages, for example:
+Используйте понятный префикс:
 
 ```text
-docs(architecture): define frontend repository boundary
-chore(repo): establish pull request governance
-feat(settings): add preference editor
+feat/<тема>
+fix/<тема>
+docs/<тема>
+chore/<тема>
+refactor/<тема>
 ```
 
-Avoid vague messages such as `fix`, `update`, `final`, `again`, `test` or `wip` as final commits.
+## Коммиты
 
-## Main branch rules
+Используйте краткие сообщения с общепринятыми префиксами назначения, например:
 
-Normal development must not push directly to `main`. The repository governance target is:
+```text
+docs: зафиксировать границу фронтенд-репозитория
+chore: установить правила работы с PR
+feat: добавить редактор настроек
+```
 
-- pull request required before merge;
-- conversation resolution required;
-- linear history required;
-- force pushes blocked;
-- branch deletion blocked;
-- no phantom required status check before a stable CI check actually exists.
+Не используйте расплывчатые финальные сообщения вроде `fix`, `update`, `final`, `again`, `test` или `wip`.
 
-A second human approval is not required by default for this solo repository. PR review, automated checks when present, and explicit owner acceptance provide the normal gate.
+## Правила ветки main
 
-## Merge policy
+Обычная разработка не должна отправлять коммиты напрямую в `main`. Целевые правила репозитория:
 
-- squash merge: default;
-- rebase merge: allowed when preserving individual commits is useful;
-- merge commits: disabled for `main`;
-- update branch: enabled when repository settings support it.
+- PR обязателен перед слиянием;
+- все обсуждения должны быть разрешены перед слиянием;
+- требуется линейная история;
+- принудительная отправка (`force push`) запрещена;
+- удаление ветки `main` запрещено;
+- фиктивные обязательные проверки состояния не добавляются до появления реально работающего стабильного CI.
 
-## Cross-repository changes
+Обязательное одобрение второго человека по умолчанию не требуется, чтобы персональный репозиторий оставался работоспособным. Нормальный контроль обеспечивают PR, автоматические проверки при их наличии и явная приёмка владельцем.
 
-A PR that depends on `AzurPilot-private-Ru` must explicitly state the backend impact and whether the backend change already exists, is coordinated separately, or is deferred.
+## Политика слияния
 
-Do not copy privileged backend logic into this repository to avoid a cross-repo change.
+- squash-слияние — вариант по умолчанию;
+- rebase-слияние допустимо, когда отдельные коммиты действительно имеют самостоятельную ценность;
+- merge-коммиты в `main` запрещены;
+- предложение обновить ветку PR должно быть включено в настройках репозитория.
 
-## Security and public-repository hygiene
+## Изменения между репозиториями
 
-Never commit:
+PR, зависящий от `AzurPilot-private-Ru`, обязан явно описывать влияние на бэкенд и указывать, существует ли нужное изменение бэкенда, разрабатывается ли оно отдельно или сознательно отложено.
 
-- real public IPs or private deployment details;
-- router credentials;
-- API/GitHub/MCP tokens;
-- cookies, authorization headers or session data;
-- private keys/certificates;
-- `.env` contents;
-- real webhook URLs;
-- unnecessary personal filesystem paths or device identifiers.
+Нельзя копировать привилегированную логику бэкенда в этот репозиторий только ради того, чтобы избежать межрепозиторного изменения.
 
-Use placeholders such as `<user-domain>`, `<public-ip>` and `127.0.0.1:<backend-port>` in documentation.
+## Безопасность публичного репозитория
+
+Никогда не добавляйте:
+
+- реальные публичные IP-адреса и приватные данные развёртывания;
+- учётные данные роутера;
+- API-, GitHub- или MCP-токены;
+- файлы cookie, заголовки авторизации и данные сессий;
+- приватные ключи и сертификаты;
+- содержимое `.env`;
+- реальные адреса webhook;
+- ненужные персональные пути файловой системы и идентификаторы устройств.
+
+В документации используйте заполнители вроде `<домен-пользователя>`, `<публичный-ip>` и `127.0.0.1:<порт-бэкенда>`.
