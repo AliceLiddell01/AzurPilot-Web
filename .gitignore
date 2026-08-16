@@ -1,0 +1,18 @@
+# Frontend build/dependency output
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+
+# Local environment and machine-specific overrides
+.env
+.env.*
+!.env.example
+*.local
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
