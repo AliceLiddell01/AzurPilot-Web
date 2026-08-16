@@ -18,7 +18,7 @@ Verified on `personal/stable@3be3696975cb91ba0b85dbea98400381c3ced379` during St
 
 - the main WebUI is Python/PyWebIO-based and is assembled in `module/webui/app.py`;
 - `module/webui/fastapi.py` builds a Starlette ASGI application around PyWebIO and appends additional API routes;
-- `module/webui/api.py` already contains REST and WebSocket-oriented endpoints, including statistics, screenshots and device-control related behavior;
+- `module/webui/api.py` already contains partial REST, SSE/streaming and WebSocket endpoints, including statistics, notification/launcher streams, screenshots and device-control behavior;
 - remote-access infrastructure already exists in `module/webui/remote_access.py`;
 - `module/webui/process_manager.py` directly owns worker-process lifecycle and is privileged runtime code;
 - `mcp_server_sse.py` already provides MCP over the legacy HTTP+SSE transport and is mounted by the WebUI application;
