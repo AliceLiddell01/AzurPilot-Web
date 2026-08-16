@@ -1,12 +1,12 @@
 # Матрица зависимостей и миграционной готовности
 
-Audit source: `AliceLiddell01/AzurPilot-private-Ru@3be3696975cb91ba0b85dbea98400381c3ced379`.
+Источник аудита: `AliceLiddell01/AzurPilot-private-Ru@3be3696975cb91ba0b85dbea98400381c3ced379`.
 
-Полные evidence-записи находятся в [CURRENT_WEBUI_SURFACES.md](CURRENT_WEBUI_SURFACES.md). Матрица нужна как decision surface для следующих backend/frontend stages и не проектирует финальные API endpoints.
+Полные записи с доказательствами находятся в [CURRENT_WEBUI_SURFACES.md](CURRENT_WEBUI_SURFACES.md). Матрица нужна как поверхность принятия решений для следующих backend/frontend stages и не проектирует финальные API endpoints.
 
 ## Матрица
 
-| ID | Surface | Data/action dependency | Current wiring | Coupling | Migration tags | Future backend prerequisite | Confidence |
+| ID | Поверхность | Зависимость данных/действий | Текущее подключение | Связность | Теги миграции | Требование к бэкенду | Уверенность |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | S-01 | PyWebIO shell/auth | deploy state, password, process bootstrap | `_run_gui` + ASGI startup hooks | high | `SERVICE_EXTRACTION`, `SECURITY_REDESIGN`, `LEGACY_COMPATIBILITY` | browser auth/session contract отдельно от PyWebIO/process bootstrap | подтверждено кодом |
 | S-02 | OOBE | ADB discovery, template/config creation, legacy files | PyWebIO + subprocess + import HTTP | high | `SERVICE_EXTRACTION`, `SECURITY_REDESIGN`, `PRIVILEGED_POLICY`, `LEGACY_COMPATIBILITY` | bootstrap/config/import boundary | подтверждено кодом |
@@ -36,15 +36,15 @@ Audit source: `AliceLiddell01/AzurPilot-private-Ru@3be3696975cb91ba0b85dbea98400
 | S-26 | Developer utilities | manager state override, restart event, marker files, notification | direct privileged runtime callbacks | high | `INTERNAL_DEVELOPER`, `PRIVILEGED_POLICY`, `SECURITY_REDESIGN`, `DEFER_OR_REMOVE_CANDIDATE` | explicit admin product/policy decision | подтверждено кодом |
 | S-27 | OBS overlay | CL1/AP read endpoints | standalone HTML + polling | low/medium | `CONTRACT_FORMALIZATION`, `SECURITY_REDESIGN`, `LEGACY_COMPATIBILITY` | decide compatibility client + authenticated read exposure | подтверждено кодом |
 
-## Прямые dependency families
+## Группы прямых зависимостей
 
-### ProcessManager / worker lifecycle
+### ProcessManager / жизненный цикл рабочих процессов
 
-Доказанные UI execution paths: S-01, S-04, S-05, S-06, S-07, S-10, S-26. `app_lifecycle.py` также управляет общим startup/cleanup процесса WebUI.
+Доказанные UI execution paths: S-01, S-04, S-05, S-06, S-07, S-10, S-26. `app_lifecycle.py` также управляет общим запуском/очисткой процесса WebUI.
 
 **Следствие:** status и lifecycle нельзя моделировать как frontend-local state. Нужны backend read/command boundaries и единая privileged policy.
 
-### Config / scheduler / persistent settings
+### Config / scheduler / постоянные настройки
 
 Доказанные прямые или тонко-обёрнутые пути: S-02, S-04, S-05, S-06, S-08, S-09, S-11, S-19, S-20, S-21, S-22, S-25.
 
@@ -56,9 +56,9 @@ Audit source: `AliceLiddell01/AzurPilot-private-Ru@3be3696975cb91ba0b85dbea98400
 
 **Следствие:** future contract должен выражать domain/config commands, а не отдавать браузеру право редактировать raw JSON/YAML.
 
-### Filesystem
+### Файловая система
 
-Доказанные пользовательские workflow:
+Доказанные пользовательские рабочие сценарии:
 
 - S-02 — legacy import и config creation;
 - S-06 — import/export/delete config;
@@ -73,44 +73,44 @@ Audit source: `AliceLiddell01/AzurPilot-private-Ru@3be3696975cb91ba0b85dbea98400
 
 ### Device / ADB / emulator
 
-В обычных user surfaces прямой device path наиболее очевиден в OOBE ADB discovery и simulator/runtime tooling. Отдельно в `api.py` существуют live screenshot/control handlers с прямым device/scrcpy/ADB поведением, но они production-disabled. Legacy MCP также напрямую создаёт `Device` и выполняет emulator/ADB operations.
+В обычных user surfaces прямой device path наиболее очевиден в OOBE ADB discovery и simulator/runtime tooling. Отдельно в `api.py` существуют live screenshot/control handlers с прямым device/scrcpy/ADB поведением, но они отключены в рабочей сборке. Legacy MCP также напрямую создаёт `Device` и выполняет emulator/ADB operations.
 
 **Следствие:** любое последующее remote device control требует отдельного realtime + privileged + security contract.
 
-### Statistics persistence/read models
+### Statistics persistence / модели чтения
 
-S-12–S-18 и S-27 читают специализированные statistics-модули. Здесь уже существует полезная backend data ownership, но presentation mixins часто сами делают агрегацию/форматирование.
+S-12–S-18 и S-27 читают специализированные statistics-модули. Здесь уже существует полезное владение данными на стороне бэкенда, но presentation mixins часто сами делают aggregation/formatting.
 
-**Следствие:** это лучший кандидат на раннюю contract formalization: переносить данные/semantic read model, а не Python chart implementation.
+**Следствие:** это лучший кандидат на раннюю formalization контракта: переносить данные/semantic read model, а не Python chart implementation.
 
-### Network / remote access / launcher
+### Сеть / удалённый доступ / launcher
 
-S-24 использует current RemoteAccess providers. S-25 и S-11 используют launcher/deploy local-only HTTP. Эти contracts были созданы до целевого Caddy edge и не считаются remote-ready.
+S-24 использует текущие RemoteAccess providers. S-25 и S-11 используют launcher/deploy local-only HTTP. Эти contracts были созданы до целевого Caddy edge и не считаются remote-ready.
 
-## Business logic leakage classification
+## Классификация смешения бизнес-логики с UI
 
-| Класс | Основные surfaces | Вывод |
+| Класс | Основные поверхности | Вывод |
 | --- | --- | --- |
-| Presentation only / mostly presentation | S-12, части S-13–S-18, S-27 HTML | можно мигрировать после read contract formalization |
-| Presentation + orchestration | S-03, S-04, S-05, S-08, S-13–S-18, S-20, S-25 | нельзя переносить server-side aggregation/runtime lookup как client business logic |
-| UI-owned business/orchestration logic | S-09, S-19, S-21, S-22 | сначала backend service/domain extraction |
-| Direct privileged runtime control | S-02, S-06, S-07, S-10, S-23, S-26 | обязательны command policy/authz/audit boundaries |
-| Shared backend/runtime helper | statistics modules, `ProcessManager`, `State`, deploy settings, RemoteAccess | владельцем остаётся backend; React зависит только от stable contract |
+| Только представление / преимущественно представление | S-12, части S-13–S-18, S-27 HTML | можно мигрировать после formalization read contract |
+| Представление + orchestration | S-03, S-04, S-05, S-08, S-13–S-18, S-20, S-25 | нельзя переносить server-side aggregation/runtime lookup как client business logic |
+| Бизнес-/orchestration-логика принадлежит UI | S-09, S-19, S-21, S-22 | сначала backend service/domain extraction |
+| Прямое привилегированное управление средой выполнения | S-02, S-06, S-07, S-10, S-23, S-26 | обязательны command policy/authz/audit boundaries |
+| Общий backend/runtime helper | statistics modules, `ProcessManager`, `State`, deploy settings, RemoteAccess | владельцем остаётся backend; React зависит только от stable contract |
 
-## Readiness bands
+## Группы миграционной готовности
 
 ### Относительно ранняя миграционная готовность
 
 После формализации read contract: S-12, S-13, S-14, S-15, S-17, S-18. S-27 может остаться отдельным compatibility client.
 
-### Требуется backend extraction до UI migration
+### Требуется выделение backend boundary до миграции UI
 
 S-04–S-10, S-19–S-22, а также command часть S-02/S-25.
 
-### Требуется security/trust redesign до remote exposure
+### Требуется переработка security/trust до удалённого доступа
 
-S-01/S-02/S-06/S-07/S-11/S-24/S-25/S-26/S-27 и current transport families, перечисленные в `CURRENT_BACKEND_INTERFACES.md`.
+S-01/S-02/S-06/S-07/S-11/S-24/S-25/S-26/S-27 и текущие transport families, перечисленные в `CURRENT_BACKEND_INTERFACES.md`.
 
-### Отложить до product parity decision
+### Отложить до решения по продуктовой совместимости
 
 S-10 developer/tool tasks, S-16 Desktop export semantics, S-23 simulator, S-24 legacy remote access, S-26 developer utilities.

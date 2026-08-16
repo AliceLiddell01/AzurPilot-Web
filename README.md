@@ -4,9 +4,9 @@ AzurPilot-Web — будущий браузерный фронтенд для [A
 
 ## Состояние проекта
 
-**Этап 0 — архитектурная основа; Этап 1 — инвентаризация текущего WebUI.** Рабочего React-приложения для рабочей эксплуатации пока нет. Архитектурная граница уже зафиксирована, а фактическая миграционная поверхность текущего PyWebIO/ASGI WebUI проинвентаризирована на точном backend snapshot.
+**Этап 0 — архитектурная основа; Этап 1 — инвентаризация текущего WebUI.** Рабочего React-приложения для эксплуатации пока нет. Архитектурная граница уже зафиксирована, а фактическая миграционная поверхность текущего PyWebIO/ASGI WebUI проинвентаризирована на точном backend snapshot.
 
-Current WebUI inventory source:
+Источник инвентаризации текущего WebUI:
 
 ```text
 AliceLiddell01/AzurPilot-private-Ru@3be3696975cb91ba0b85dbea98400381c3ced379
@@ -28,7 +28,7 @@ AliceLiddell01/AzurPilot-private-Ru@3be3696975cb91ba0b85dbea98400381c3ced379
 
 Начните с [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md). Принятые архитектурные решения собраны в [docs/architecture/DECISIONS.md](docs/architecture/DECISIONS.md).
 
-Фактическая карта текущего WebUI и backend interfaces находится в [docs/migration/README.md](docs/migration/README.md). Она описывает snapshot существующей реализации и migration prerequisites, **а не** финальный дизайн `/api/v1`.
+Фактическая карта текущего WebUI и backend interfaces находится в [docs/migration/README.md](docs/migration/README.md). Она описывает snapshot существующей реализации и обязательные условия миграции, **а не** финальный дизайн `/api/v1`.
 
 Главный инвариант:
 
