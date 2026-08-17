@@ -14,19 +14,21 @@ SHA: 3be3696975cb91ba0b85dbea98400381c3ced379
 
 ## 2. Файлы production MCP
 
-### MCP-owned
+### Код, принадлежащий MCP
 
 | Файл | Роль | Доказательство |
 | --- | --- | --- |
-| `mcp_server_sse.py` | `Server`, 17 tools, dispatch, legacy SSE/message transport, ASGI wrapper, standalone entrypoint | [pinned source](https://github.com/AliceLiddell01/AzurPilot-private-Ru/blob/3be3696975cb91ba0b85dbea98400381c3ced379/mcp_server_sse.py) |
-| `module/config/mcp_helper.py` | метаданные задач/i18n и проекция Dashboard resources для MCP | [pinned source](https://github.com/AliceLiddell01/AzurPilot-private-Ru/blob/3be3696975cb91ba0b85dbea98400381c3ced379/module/config/mcp_helper.py) |
+| `mcp_server_sse.py` | `Server`, 17 tools, dispatch, legacy SSE/message transport, ASGI wrapper и standalone entry point | [pinned source](https://github.com/AliceLiddell01/AzurPilot-private-Ru/blob/3be3696975cb91ba0b85dbea98400381c3ced379/mcp_server_sse.py) |
+| `module/config/mcp_helper.py` | MCP-specific helper метаданных задач/i18n и проекции Dashboard resources | [pinned source](https://github.com/AliceLiddell01/AzurPilot-private-Ru/blob/3be3696975cb91ba0b85dbea98400381c3ced379/module/config/mcp_helper.py) |
 
-### Подключение и объявления зависимостей
+### Подключение и зависимости
 
 | Файл | Роль | Доказательство |
 | --- | --- | --- |
 | `module/webui/app.py` | production mount `application.mount("/mcp", mcp_app)` | [pinned source](https://github.com/AliceLiddell01/AzurPilot-private-Ru/blob/3be3696975cb91ba0b85dbea98400381c3ced379/module/webui/app.py) |
-| `pyproject.toml` | `mcp==1.23.0`, `sse-starlette==3.0.3`, ограничения Starlette/Uvicorn | [pinned source](https://github.com/AliceLiddell01/AzurPilot-private-Ru/blob/3be3696975cb91ba0b85dbea98400381c3ced379/pyproject.toml) |
+| `pyproject.toml` | `mcp==1.23.0`, `sse-starlette==3.0.3`, `starlette==0.49.1`, Uvicorn | [pinned source](https://github.com/AliceLiddell01/AzurPilot-private-Ru/blob/3be3696975cb91ba0b85dbea98400381c3ced379/pyproject.toml) |
+
+Repository-wide discovery и import/wiring graph не обнаружили второго production MCP server construction, второго registration catalog или альтернативного production mount на этом snapshot. Методика и границы доказательства описаны в [сверке приёмки](STAGE_2_ACCEPTANCE_RECONCILIATION.md).
 
 ### Общие зависимости среды выполнения
 
@@ -36,31 +38,30 @@ MCP adapter напрямую использует, но не владеет:
 - `module.config.config.AzurLaneConfig`;
 - `module.webui.setting.State`;
 - `module.device.device.Device`;
-- config/args/i18n files через `McpConfigHelper`;
+- config/args/i18n через `McpConfigHelper`;
 - локальные журналы `./log/...`;
 - `subprocess` для ADB;
 - process-global `ALAS_CONFIG_NAME` и fake-PIL compatibility hook.
 
-## 3. Точная версия SDK
+## 3. Версии SDK и transport-зависимостей
 
 **CURRENT FACT**
 
-`pyproject.toml` содержит:
+`pyproject.toml` фиксирует:
 
 ```text
 mcp==1.23.0
 sse-starlette==3.0.3
+starlette==0.49.1
 ```
 
-Официальный release `mcp` v1.23.0 относится к поколению спецификации `2025-11-25`; текущий AzurPilot не использует Python SDK v2 и не реализует protocol core `2026-07-28`.
+Текущий AzurPilot использует low-level Python SDK v1.x и `SseServerTransport`.
 
 **OFFICIAL MCP TARGET GUIDANCE**
 
-Актуальная опубликованная ревизия — `2026-07-28`. Она перешла к stateless protocol core и формально считает legacy HTTP+SSE transport deprecated. Текущая стабильная линия официального Python SDK — v2, тогда как v1.x оставлен в maintenance mode.
+Актуальная опубликованная ревизия MCP — `2026-07-28`; официальный Python SDK v2 является текущей stable line, v1.x — maintenance. Legacy HTTP+SSE transport deprecated. Это целевой ориентир, а не описание текущего AzurPilot.
 
-Это целевой ориентир, а не описание текущего AzurPilot.
-
-## 4. Создание сервера и регистрация capabilities
+## 4. Создание сервера и регистрации
 
 **CURRENT FACT**
 
@@ -69,14 +70,14 @@ helper = McpConfigHelper()
 mcp_server = Server("AzurPilot-MCP")
 ```
 
-Зарегистрированы только два low-level handler families:
+Зарегистрированы два low-level handler family:
 
 ```text
 @mcp_server.list_tools()
 @mcp_server.call_tool()
 ```
 
-Итог:
+Покрытие:
 
 ```text
 tools: 17
@@ -86,17 +87,16 @@ prompts: 0
 completions: 0
 subscriptions: 0
 experimental/extensions registrations: 0
+unmapped registrations: 0
 ```
 
-В `mcp==1.23.0` capabilities объявляются по наличию соответствующих request handlers. Поскольку AzurPilot не регистрирует `list_resources`, `list_resource_templates`, `list_prompts`, `completion` или experimental handlers, эти capability families не публикуются текущим сервером.
+Ни один текущий `Tool(...)` не объявляет `annotations` или `outputSchema`.
 
-Ни один `Tool(...)` не содержит `annotations` или `outputSchema`.
-
-## 5. Embedded production path
+## 5. Embedded production mode
 
 **CURRENT FACT**
 
-`module/webui/app.py::app()` выполняет:
+`module/webui/app.py::app()` импортирует MCP child app и после сборки основного ASGI-приложения выполняет:
 
 ```text
 from mcp_server_sse import app as mcp_app
@@ -104,7 +104,7 @@ from mcp_server_sse import app as mcp_app
 application.mount("/mcp", mcp_app)
 ```
 
-Внутри MCP module:
+В `mcp_server_sse.py`:
 
 ```text
 transport = SseServerTransport("/mcp/messages")
@@ -112,124 +112,110 @@ app = Starlette(...)
 app.mount("/", mcp_asgi_app)
 ```
 
-Проверка точных зависимостей `starlette==0.49.1` и `mcp==1.23.0` показывает важную особенность вложенного mount:
+### Эффективные пути
 
-1. outer `Mount("/mcp")` добавляет `/mcp` в `scope.root_path` дочернего ASGI-приложения;
-2. внутренний `Mount("/")` не добавляет новый непустой префикс;
-3. `SseServerTransport.connect_sse()` вычисляет адрес POST как `scope.root_path.rstrip("/") + self._endpoint`;
-4. `self._endpoint` в AzurPilot уже равен `/mcp/messages`.
-
-Поэтому фактически endpoint event embedded SSE-session содержит **двойной префикс**:
-
-```text
-/mcp/mcp/messages?session_id=<uuid>
-```
-
-Пользовательский request path embedded режима:
-
-```text
-MCP client
-    |
-    | GET /mcp/sse
-    v
-outer WebUI Starlette
-    |
-    | mount /mcp; child root_path=/mcp
-    v
-MCP Starlette wrapper
-    |
-    | mcp_asgi_app: path.endswith("/sse")
-    v
-SseServerTransport.connect_sse()
-    |
-    | endpoint event -> /mcp/mcp/messages?session_id=<uuid>
-    v
-client POST /mcp/mcp/messages?session_id=<uuid>
-    |
-    | outer mount /mcp
-    v
-mcp_asgi_app -> path.endswith("/messages")
-    |
-    v
-SseServerTransport.handle_post_message()
-    |
-    v
-Server.run() -> tools/call -> call_tool() -> TOOL_HANDLERS
-    |
-    v
-AzurPilot runtime/core
-```
-
-Эффективные embedded URL families:
+Сочетание outer `Mount("/mcp")`, Starlette `root_path` и уже префиксованного endpoint `"/mcp/messages"` даёт:
 
 ```text
 GET  /mcp/sse
 POST /mcp/mcp/messages?session_id=<uuid>
 ```
 
-Двойной `/mcp` не делает POST недостижимым: custom `mcp_asgi_app` использует suffix matching, а не declarative Starlette `Route`, поэтому исходный путь `/mcp/mcp/messages` проходит проверку `path.endswith("/messages")`.
+Причина двойного `/mcp`:
 
-Это **CURRENT FACT о compatibility quirk текущего transport wiring**, а не целевой URL. Следующая transport migration не должна переносить этот двойной префикс как контракт.
+1. outer mount добавляет `/mcp` в `scope.root_path` child app;
+2. внутренний `Mount("/")` не добавляет непустой префикс;
+3. `SseServerTransport.connect_sse()` строит endpoint event как `root_path + self._endpoint`;
+4. `self._endpoint` уже равен `/mcp/messages`.
 
-Доказательства поведения зависимостей:
+POST остаётся достижимым внутри текущего wrapper, потому что `mcp_asgi_app` использует suffix matching `path.endswith("/messages")`.
 
-- Starlette `Mount.matches()` в версии `0.49.1` накапливает `root_path` дочернего приложения;
-- `SseServerTransport` версии `1.23.0` прибавляет свой `_endpoint` к `scope.root_path` перед отправкой endpoint event.
+Двойной префикс является **CURRENT FACT о compatibility quirk**, а не целевым URL-контрактом.
+
+### Полный путь вызова
+
+```text
+MCP client
+    |
+    | GET /mcp/sse
+    v
+WebUI Starlette
+    |
+    | Mount /mcp
+    v
+MCP Starlette wrapper
+    |
+    v
+SseServerTransport.connect_sse()
+    |
+    | endpoint event: /mcp/mcp/messages?session_id=<uuid>
+    v
+client POST /mcp/mcp/messages?... 
+    |
+    v
+SseServerTransport.handle_post_message()
+    |
+    v
+Server.run()
+    |
+    v
+tools/call -> call_tool() -> TOOL_HANDLERS
+    |
+    v
+ProcessManager / AzurLaneConfig / Device / FS / subprocess
+    |
+    v
+AzurPilot runtime/core
+```
 
 ## 6. Standalone mode
 
 **CURRENT FACT**
 
-При прямом запуске `mcp_server_sse.py` выполняется:
+При прямом запуске `mcp_server_sse.py`:
 
 ```python
 uvicorn.run(app, host="0.0.0.0", port=22268)
 ```
 
-То есть процесс **может слушать все интерфейсы** на порту `22268`.
+То есть процесс способен слушать все интерфейсы на порту `22268`.
 
-Это не доказывает internet reachability. Router/NAT/firewall/OS ACL/Caddy конкретной машины Этап 2 не проверяет.
+Это **не доказывает** Internet/LAN reachability конкретного компьютера: router, NAT, firewall, OS ACL и Caddy не входят в статический аудит.
 
-Standalone использует ту же Starlette wrapper и тот же `SseServerTransport`; отдельной auth/security policy для standalone нет.
-
-В standalone режиме top-level `root_path` пуст, поэтому transport endpoint event не получает outer `/mcp` prefix и рекламирует:
+Standalone использует тот же MCP Starlette wrapper и тот же `SseServerTransport`, но top-level `root_path` пуст. Поэтому endpoint event содержит:
 
 ```text
 /mcp/messages?session_id=<uuid>
 ```
 
-Custom suffix router принимает этот путь. SSE connect при обычном top-level вызове доступен через suffix `/sse`; код также не задаёт declarative route-level ограничение только одним абсолютным URL.
+SSE connect принимается current suffix-router по пути, заканчивающемуся на `/sse`.
 
-Таким образом, embedded и standalone режимы имеют **разные фактические endpoint-event paths**, несмотря на общий `SseServerTransport`.
+Таким образом, embedded и standalone режимы имеют разные фактические endpoint-event paths.
 
-## 7. Legacy SSE session model
+## 7. Жизненный цикл и состояние legacy SSE
 
-**CURRENT FACT**, включая поведение точной зависимости `mcp==1.23.0`.
+**CURRENT FACT**
 
-`SseServerTransport`:
+`SseServerTransport` точной версии `mcp==1.23.0`:
 
 1. создаёт UUID `session_id` при SSE connect;
 2. хранит process-local mapping `session_id -> MemoryObjectSendStream`;
-3. отправляет клиенту endpoint event с `session_id`;
-4. POST message ищет writer по этому UUID;
-5. JSON-RPC body валидируется Pydantic-моделью SDK;
-6. accepted POST получает HTTP `202`, после чего message передаётся в process-local stream текущей SSE session.
+3. отправляет endpoint event клиенту;
+4. POST ищет writer по UUID;
+5. JSON-RPC body проходит SDK parsing/validation;
+6. принятый POST получает HTTP `202`, после чего сообщение попадает в stream текущей SSE session.
 
-После restart процесса эта in-memory session registry теряется. Horizontal/shared-state semantics отсутствуют.
+Состояние сессий находится в памяти процесса. После restart процесса registry теряется; общей межпроцессной/horizontal state модели нет.
 
-`mcp_server.run(...)` вызывается с default `stateless=False`, поэтому current lifecycle соответствует handshake/session-era SDK, а не `2026-07-28` stateless core.
+`mcp_server.run(...)` использует session-era semantics SDK v1.x. Это не целевая stateless модель MCP `2026-07-28`.
 
-**OFFICIAL MCP TARGET GUIDANCE**
-
-Ревизия `2026-07-28` убрала protocol-level handshake/session core и перенесла идентичность/version/capabilities запроса в request metadata. Следующий transport design не должен копировать hidden SSE session state только ради parity.
-
-## 8. Transport security: что реально включено
+## 8. CORS, Host, Origin и локальность
 
 ### CORS
 
 **CURRENT FACT**
 
-MCP Starlette wrapper задаёт:
+Wrapper задаёт:
 
 ```python
 CORSMiddleware(
@@ -239,112 +225,105 @@ CORSMiddleware(
 )
 ```
 
-### SDK-level DNS-rebinding protection
+### SDK DNS-rebinding protection
 
 **CURRENT FACT**
 
-В `mcp==1.23.0` `SseServerTransport` создаёт `TransportSecurityMiddleware(security_settings)`.
+`SseServerTransport` создаёт `TransportSecurityMiddleware(security_settings)`. В AzurPilot `security_settings=None`; compatibility-конструктор SDK v1.23.0 при этом отключает `enable_dns_rebinding_protection`.
 
-Но при `security_settings=None`, как в AzurPilot, constructor middleware намеренно подставляет:
+Следствие для current adapter:
 
 ```text
-enable_dns_rebinding_protection = false
+Host validation: выключена
+Origin validation: выключена
+POST Content-Type validation: выполняется отдельно
 ```
 
-для backwards compatibility. Поэтому `Host` и `Origin` **не проверяются** SDK transport middleware в текущем AzurPilot.
-
-При этом POST всегда проходит отдельную проверку `Content-Type`, даже когда DNS-rebinding protection выключена; ожидается `application/json...`.
-
-### Authentication / authorization
+### Аутентификация и авторизация
 
 **CURRENT FACT**
 
-- в `mcp_server_sse.py` нет auth/authz middleware или locality guard;
-- `module/webui/app.py::_run_gui()` выполняет PyWebIO password gate только внутри PyWebIO entry points;
-- MCP монтируется отдельным ASGI child app после сборки outer application;
-- tool handlers не получают actor/identity/permission context.
+- MCP wrapper не добавляет auth/authz middleware или locality guard;
+- tool handlers не получают actor/identity/permission context;
+- PyWebIO login выполняется внутри `_run_gui()`;
+- MCP монтируется отдельным ASGI child app.
 
-Следовательно, PyWebIO password gate не является текущей защитой MCP route family.
+Поэтому PyWebIO password gate не является общей защитой MCP route family.
 
-Фактическая внешняя сетевая достижимость не устанавливается этим выводом.
+Фактическая внешняя достижимость этим выводом не устанавливается.
 
-## 9. Input validation
-
-**CURRENT FACT**
-
-Слой валидации состоит из двух частей.
-
-### SDK JSON Schema validation
-
-`mcp==1.23.0::Server.call_tool(validate_input=True)` по умолчанию получает cached `Tool.inputSchema` и выполняет `jsonschema.validate()` до вызова AzurPilot handler. Ошибка схемы становится `CallToolResult(isError=True)`.
-
-Поэтому утверждение «у MCP вообще нет input validation» было бы неверным.
-
-### Domain validation AzurPilot
-
-После schema validation текущие handlers часто имеют минимальные semantic checks:
-
-- `instance` обычно только `string`, без schema enum существующих экземпляров;
-- `get_task_help` неизвестной задачи возвращает `{}`;
-- `update_config` принимает произвольные `task/group/arg` strings и напрямую вызывает `config.cross_set(path, value)`;
-- `trigger_task` не проверяет task против отдельного allowlist перед `cross_set`;
-- `get_recent_logs.lines` имеет тип integer, но без min/max;
-- `restart_adb.instance` необязателен, но выбранный instance не ограничивает фактическую system-wide ADB операцию.
-
-## 10. Error flow
+## 9. Валидация входа
 
 **CURRENT FACT**
 
-SDK v1.23.0 умеет возвращать `CallToolResult(isError=True)` для schema validation и для исключений, которые доходят до wrapper handler.
+### SDK JSON Schema
 
-AzurPilot `call_tool()` при этом сам ловит почти все handler exceptions:
+`Server.call_tool(validate_input=True)` валидирует arguments против advertised `Tool.inputSchema`. Ошибка схемы возвращается SDK как `CallToolResult(isError=True)`.
+
+### Доменная валидация AzurPilot
+
+После protocol/schema validation текущие handlers часто ограничиваются минимальными semantic checks:
+
+- `instance` обычно только `string`, без отдельной policy разрешённых экземпляров;
+- `get_task_help` возвращает `{}` для неизвестной задачи;
+- `update_config` принимает model-controlled `task/group/arg` и вызывает `cross_set`;
+- `trigger_task` не валидирует task по отдельному allowlist перед config mutation;
+- `get_recent_logs.lines` не имеет min/max;
+- `restart_adb.instance` не ограничивает machine-wide ADB operation.
+
+JSON Schema здесь не заменяет authorization, target resolution, field policy и runtime preconditions.
+
+## 10. Поток ошибок
+
+**CURRENT FACT**
+
+SDK умеет представить schema validation failure как `isError=true`.
+
+Однако `mcp_server_sse.py::call_tool()` ловит handler exceptions и возвращает обычный `TextContent("Ошибка: ...")`. После этого SDK нормализует content как обычный tool result с `isError=false`.
+
+Имеются два канала ошибок:
 
 ```text
-except Exception as e:
-    logger.exception(...)
-    return TextContent("Ошибка: ...")
+schema failure до AzurPilot handler
+    -> MCP isError=true
+
+runtime/domain failure, превращённый adapter в TextContent
+    -> MCP isError=false + текст ошибки
 ```
 
-После такого возврата SDK нормализует список content blocks как обычный `CallToolResult(isError=False)`.
+Несколько handlers самостоятельно возвращают `Error: ...` как обычный текст. `get_screenshot` и `restart_emulator` дополнительно способны включать traceback в model-facing result.
 
-Аналогично несколько individual handlers возвращают строки `Error: ...` вместо structured/error result. Поэтому у current server существуют два разных error channels:
-
-```text
-schema error before AzurPilot handler -> MCP isError=true
-runtime/domain error, преобразованный AzurPilot в TextContent -> MCP isError=false + error text
-```
-
-`get_screenshot` и `restart_emulator` дополнительно включают полный Python traceback в текст ошибки.
-
-## 11. Long-running / cancellation / retry / concurrency
+## 11. Таймауты, отмена, повтор и конкурентность
 
 **CURRENT FACT**
 
 В MCP-owned коде не обнаружены:
 
 - per-tool timeout;
-- idempotency/deduplication key;
 - command ID;
+- idempotency/deduplication key;
 - MCP-level rate limit;
 - actor-aware audit event;
-- application-level cancellation protocol;
+- отдельный application-level cancellation protocol;
 - per-capability permission gate.
 
-Отдельные runtime dependencies могут иметь собственные locks/timeouts. Например, `ProcessManager.start/stop` использует lifecycle locks и stop timeouts; это не является MCP request timeout или deduplication.
+Отдельные runtime dependencies могут иметь собственные locks/timeouts. Например, `ProcessManager` имеет lifecycle locks и stop timeouts, но это не MCP request timeout и не replay contract.
 
-Особые случаи:
+Критические примеры:
 
-- `restart_emulator` вызывает `time.sleep(60)` **внутри `async def`**, блокируя event-loop thread этого процесса на минуту до `emulator_start()`;
-- `restart_adb` вызывает два `subprocess.run(..., check=False)` без заданного timeout и не проверяет return code;
-- `get_recent_logs` загружает весь дневной log через `readlines()` до tail slicing;
-- `get_current_running_task` тоже читает дневной log целиком и подавляет ошибки bare `except`;
-- повтор `trigger_task`, `clear_scheduler_queue`, start/stop/restart после client timeout не имеет MCP-level deduplication semantics.
+- `restart_emulator` выполняет `time.sleep(60)` внутри `async def`;
+- `restart_adb` выполняет blocking `subprocess.run(..., check=False)` без timeout и не проверяет return code;
+- `get_recent_logs` читает весь дневной файл через `readlines()` до tail slicing;
+- `get_current_running_task` тоже читает журнал целиком и подавляет ошибки чтения/парсинга;
+- повтор control operation после client timeout не имеет MCP-level dedup semantics.
 
-## 12. Прямые privilege domains
+Статический аудит не утверждает точную wall-clock длительность runtime/device операций конкретной установки.
 
-| Область | Current path |
+## 12. Прямые области привилегий
+
+| Область | Текущий путь |
 | --- | --- |
-| metadata/config definitions | `McpConfigHelper` -> args/i18n files |
+| metadata/config definitions | `McpConfigHelper` → args/i18n files |
 | instance/runtime state | `ProcessManager.get_manager()` |
 | process control | `ProcessManager.start/stop()` |
 | config read/write | `AzurLaneConfig.data`, `cross_set`, `save` |
@@ -354,7 +333,22 @@ runtime/domain error, преобразованный AzurPilot в TextContent ->
 | emulator lifecycle | `Device.emulator_stop/start()` |
 | system ADB | executable resolution + `adb kill-server/start-server` |
 
-## 13. Схема текущей архитектуры
+## 13. Глобальное и разделяемое состояние
+
+**CURRENT FACT**
+
+Текущий MCP path опирается на несколько уровней состояния:
+
+- process-local registry SSE sessions внутри `SseServerTransport`;
+- singleton-like manager registry через `ProcessManager`/`State`;
+- persistent config-файлы через `AzurLaneConfig`;
+- process environment/`ALAS_CONFIG_NAME` и fake-PIL compatibility context для device paths;
+- локальную файловую систему журналов;
+- системный ADB server за пределами одного instance.
+
+Эти уровни не образуют единую транзакционную или actor-aware модель.
+
+## 14. ASCII-схема текущей архитектуры
 
 ```text
                           embedded mode
@@ -362,12 +356,12 @@ PyWebIO WebUI app
     |
     +-- _run_gui() password gate ----- PyWebIO sessions
     |
-    `-- mount /mcp -------------------------------+
+    `-- Mount /mcp -------------------------------+
                                                    |
                                                    v
                                          MCP Starlette wrapper
                                          CORS: wildcard
-                                         auth: none here
+                                         auth: отсутствует
                                                    |
                       +----------------------------+--------------------+
                       |                                                 |
@@ -394,11 +388,11 @@ uvicorn 0.0.0.0:22268 -> тот же MCP Starlette wrapper
 endpoint event -> /mcp/messages?session_id=<uuid>
 ```
 
-## 14. Целевая интерпретация
+## 15. Целевая интерпретация
 
 **TARGET DECISION**
 
-Ни CORS, ни Tool Annotations, ни transport migration сами по себе не являются authorization boundary. Будущий MCP должен зависеть от общего backend policy/service layer:
+Ни CORS, ни Tool Annotations, ни одна только transport migration не являются authorization boundary. Будущий MCP должен зависеть от общей политики бэкенда и сервисного слоя:
 
 ```text
 MCP transport
@@ -406,7 +400,7 @@ MCP transport
   -> authorization / permission
   -> validation / policy / audit
   -> Application / Service Layer
-  -> runtime/core
+  -> AzurPilot Core
 ```
 
 Точная реализация Streamable HTTP, OAuth и service packages не проектируется в Этапе 2.
