@@ -2,269 +2,292 @@
 
 Источник текущего состояния: `AliceLiddell01/AzurPilot-private-Ru@3be3696975cb91ba0b85dbea98400381c3ced379`.
 
-## Как читать severity
+## Правила интерпретации
 
-Severity оценивает **риск capability/transport при достижимости MCP клиентом**, но не приписывает домашнему ПК недоказанную internet reachability. Router/NAT/firewall/Caddy/OS ACL конкретной машины не входят в статический аудит.
+Severity оценивает риск capability/transport **при достижимости MCP клиентом**. Статический аудит не устанавливает router/NAT/firewall/OS ACL/Caddy и не утверждает, что конкретный домашний ПК доступен из Интернета.
 
-Официальные требования MCP `2026-07-28` ниже помечены как **OFFICIAL MCP TARGET GUIDANCE** и не выдаются за требования, уже реализованные current legacy server.
+Современные требования MCP помечаются как **OFFICIAL MCP TARGET GUIDANCE** и не выдаются за уже реализованные свойства legacy server.
 
-## MCP-SEC-001 — MCP route family не имеет текущей authentication/authorization boundary
+## MCP-SEC-001 — отсутствует общая authentication/authorization boundary MCP
 
-**Severity:** High при network/client reachability.
+**Severity:** High при сетевой достижимости.
 
-**CURRENT FACT**
+**CURRENT FACT — доказательство:** `mcp_server_sse.py` не добавляет auth/authz middleware; все 17 tools идут через единый dispatch без actor/permission context. PyWebIO password gate находится в `module/webui/app.py::_run_gui()`, тогда как MCP подключается отдельным child ASGI app через `application.mount("/mcp", mcp_app)`. Standalone использует тот же MCP app без отдельного auth layer.
 
-- `mcp_server_sse.py` не добавляет auth/authz middleware;
-- 17 tools не получают actor/permission context;
-- PyWebIO password gate находится в `module/webui/app.py::_run_gui()`;
-- MCP child app монтируется отдельно через `application.mount("/mcp", mcp_app)`;
-- standalone mode использует тот же MCP app без дополнительного auth layer.
+**Влияние при сетевой достижимости:** клиент, достигший transport и прошедший protocol/schema validation, получает общий каталог от metadata reads до config/process/device/scheduler/system operations.
 
-**Impact if remotely reachable**
+**Доказано:** отсутствие auth/authz в проверенном MCP wrapper, handlers и embedded wiring.
 
-Любой клиент, способный достичь transport и пройти protocol/schema validation, получает один и тот же каталог, включая config/process/device/scheduler/system operations.
+**Не доказано:** внешняя/LAN/internet reachability конкретной установки.
 
-**Что доказано:** отсутствие auth/authz в проверенном MCP/outer wiring.
+**Затронуто:** MCP-T-001…MCP-T-017, MCP-TR-001/002.
 
-**Что не доказано:** доступность порта/route из Интернета на конкретной машине.
+**Обоснование severity:** одна неразделённая boundary защищает одновременно R0/R1 и R3/R4 operations; при достижимости ущерб не ограничен read-only данными.
 
-**Affected:** все MCP-T-001…017.
-
-**TARGET prerequisite:** authentication + permission-aware authorization до dispatch в service layer.
-
-**OFFICIAL MCP TARGET GUIDANCE:** актуальная спецификация требует proper access controls для tools; remote HTTP authorization имеет отдельную современную authorization model.
+**Целевое условие:** authentication + permission-aware authorization до dispatch в Application/Service Layer.
 
 ## MCP-SEC-002 — wildcard CORS и выключенная SDK DNS-rebinding validation
 
 **Severity:** High при browser/network reachability.
 
-**CURRENT FACT**
+**CURRENT FACT — доказательство:** MCP Starlette wrapper использует `allow_origins=["*"]`, `allow_methods=["*"]`, `allow_headers=["*"]`. В точной зависимости `mcp==1.23.0` `SseServerTransport` создаёт transport security middleware, но при `security_settings=None` DNS-rebinding protection выключена для backwards compatibility, поэтому `Host` и `Origin` не валидируются. POST `Content-Type` проверяется отдельно. Standalone способен bind на `0.0.0.0:22268`.
 
-MCP Starlette wrapper использует:
+**Влияние при сетевой достижимости:** browser/network trust surface не имеет текущей Origin/Host boundary на уровне MCP adapter.
 
-```text
-allow_origins=["*"]
-allow_methods=["*"]
-allow_headers=["*"]
-```
+**Доказано:** настройки CORS, SDK security settings и standalone bind instruction.
 
-В точной зависимости `mcp==1.23.0` `SseServerTransport` действительно содержит `TransportSecurityMiddleware`, но при `security_settings=None` middleware специально создаётся с `enable_dns_rebinding_protection=False` для backwards compatibility. Поэтому `Host` и `Origin` не валидируются. POST `Content-Type` проверяется независимо и должен начинаться с `application/json`.
+**Не доказано:** browser exploitability, public routing или Caddy exposure конкретной машины.
 
-Standalone дополнительно способен bind на `0.0.0.0:22268`.
+**Затронуто:** MCP-TR-001/002 и все tools.
 
-**Что доказано:** transport security settings и bind instruction в коде.
+**Обоснование severity:** отсутствие Origin/Host validation рядом с wildcard CORS существенно при reachable HTTP surface, особенно для локального сервера.
 
-**Что не доказано:** internet reachability, браузерная эксплуатация или Caddy route конкретной установки.
+**Целевое условие:** secure public-edge topology, Origin/Host/trusted-proxy policy и authentication. Wildcard CORS не считать security mechanism.
 
-**Affected:** transport MCP-TR-001/002 и все tools.
+**OFFICIAL MCP TARGET GUIDANCE:** современная HTTP transport guidance требует Origin validation против DNS rebinding; локальным серверам рекомендуется loopback bind, remote deployments требуют proper authentication.
 
-**TARGET prerequisite:** secure public-edge topology, Origin/Host/trusted-proxy policy и authentication; не полагаться на wildcard CORS как security mechanism.
-
-**OFFICIAL MCP TARGET GUIDANCE:** Streamable HTTP guidance требует защищаться от DNS rebinding, в том числе проверять `Origin`; локальные серверы рекомендуется bind'ить на localhost, а remote deployments — защищать auth.
-
-## MCP-SEC-003 — плоская privilege plane: R0/R1 и R3/R4 доступны через один dispatch
+## MCP-SEC-003 — плоская privilege plane
 
 **Severity:** High.
 
-**CURRENT FACT**
+**CURRENT FACT — доказательство:** `TOOL_HANDLERS` — единый dictionary dispatch без permission split. В одном каталоге находятся metadata/operational reads и `update_config`, start/stop, scheduler mutations, screenshot, emulator restart и machine-wide ADB restart. Распределение risk: R0=2, R1=7, R2=0, R3=7, R4=1.
 
-`TOOL_HANDLERS` — единый dictionary dispatch без permission split. В одном каталоге находятся metadata reads и операции:
+**Влияние:** compromise или misconfiguration одной MCP connection boundary автоматически расширяет доступ от чтения к privileged control.
 
-- `update_config`;
-- `start_instance` / `stop_instance`;
-- `trigger_task` / `clear_scheduler_queue`;
-- `get_screenshot`;
-- `restart_emulator`;
-- `restart_adb`.
+**Доказано:** единый dispatch и отсутствие per-capability permission gate.
 
-Risk distribution: R0=2, R1=7, R3=7, R4=1.
+**Не доказано:** факт компрометации конкретного клиента/хоста.
 
-**Impact:** compromise/misconfiguration одной MCP connection boundary автоматически даёт весь набор привилегий.
+**Затронуто:** все 17 tools.
 
-**TARGET prerequisite:** least-privilege scopes, service-level policy и запрет implicit escalation от read к control.
+**Обоснование severity:** максимальная привилегия connection plane определяется R4 capability, а не наиболее безопасным tool.
 
-## MCP-SEC-004 — `get_config` и `update_config` обходят безопасную доменную границу конфигурации
+**Целевое условие:** least-privilege scopes, service-level policy и отсутствие implicit escalation read → control.
+
+## MCP-SEC-004 — raw config read/write обходит безопасную доменную границу
 
 **Severity:** High.
 
-**CURRENT FACT**
+**CURRENT FACT — доказательство:** `get_config` может вернуть весь `AzurLaneConfig.data` или raw task section. `update_config` собирает model-controlled `task/group/arg` path и вызывает `AzurLaneConfig.cross_set(path,value)`. Это не воспроизводит WebUI parsing/validation/`ConfigUpdater.save_callback` policy из Stage 1.
 
-`get_config` может вернуть весь `AzurLaneConfig.data` или raw task section.
+**Влияние:** чрезмерно широкая confidentiality surface для чтения и возможность mutation в обход UI-owned domain validation semantics.
 
-`update_config` собирает path из model-controlled `task/group/arg` и вызывает `AzurLaneConfig.cross_set(path,value)`. `cross_set` не проверяет semantic allowlist: он добавляет path в `modified` и вызывает обычный config `update()`.
+**Доказано:** current raw read/write path и отличие от WebUI validation path.
 
-Это отличается от текущего WebUI `TaskConfigMixin::_save_config`, где есть parsing, validation expressions, defaults, `ConfigUpdater.save_callback` и отдельные domain warnings/side effects.
+**Не доказано:** что любой произвольный path эксплуатируем; что каждый config содержит секреты.
 
-**Impact:** MCP mutation path способен обойти UI-specific validation/domain semantics; raw config read имеет чрезмерно широкую confidentiality surface.
+**Затронуто:** MCP-T-006, MCP-T-007; косвенно scheduler config mutations.
 
-**Что не утверждается:** что каждый произвольный path обязательно приводит к exploitable состоянию или что в каждом config есть секрет.
+**Обоснование severity:** capability затрагивает persistent automation configuration и не ограничена field-level authorization unit.
 
-**Affected:** MCP-T-006, MCP-T-007; косвенно scheduler tools.
+**Целевое условие:** `ConfigService` с allowlist, field/domain validation, redaction и server-owned save policy.
 
-**TARGET prerequisite:** `ConfigService` с server-owned schema/field policy/domain validation; никаких raw JSON dump/write как public capability.
-
-## MCP-SEC-005 — runtime/domain ошибки часто маркируются как успешный MCP tool result
+## MCP-SEC-005 — runtime/domain ошибки часто маркируются как успешный MCP result
 
 **Severity:** Medium-High.
 
-**CURRENT FACT**
+**CURRENT FACT — доказательство:** SDK schema failure способен дать `CallToolResult(isError=True)`, но AzurPilot `call_tool()` ловит handler exceptions и возвращает `TextContent("Ошибка: ...")`; SDK затем формирует обычный result с `isError=false`. Ряд handlers также возвращает `Error: ...` как обычный текст.
 
-Точная версия SDK умеет вернуть `CallToolResult(isError=True)` для JSON Schema validation failure.
+**Влияние:** модель/клиент не может надёжно отличить validation failure, conflict/precondition, retryable runtime failure и обычный success.
 
-Но AzurPilot `call_tool()` ловит exceptions и возвращает `TextContent("Ошибка: ...")`. После этого SDK видит обычный content list и формирует `isError=False`. Аналогично handlers возвращают обычный текст для:
+**Доказано:** два разных error channels в текущем adapter/SDK path.
 
-- already running/stopped;
-- not running;
-- log read/not-found;
-- screenshot/emulator failure;
-- restart ADB failure.
+**Не доказано:** как конкретный внешний MCP client интерпретирует текстовую ошибку.
 
-**Impact:** модель/клиент не может надёжно отличить validation failure, retryable runtime failure и обычный успешный text result.
+**Затронуто:** все tools; особенно privileged commands.
 
-**TARGET prerequisite:** структурированная error taxonomy с validation/conflict/precondition/retryable/internal классами и корректным MCP error/result contract.
+**Обоснование severity:** ошибочная классификация результата может провоцировать неправильный follow-up или повтор side effect.
 
-## MCP-SEC-006 — ложные или неоднозначные success responses у control tools
+**Целевое условие:** структурированная error taxonomy и корректный MCP error/result contract.
+
+## MCP-SEC-006 — ложные или неоднозначные success responses control tools
 
 **Severity:** Medium-High.
 
-**CURRENT FACT**
+**CURRENT FACT — доказательство:** `start_instance` не получает подтверждающий result от `ProcessManager.start()`; `stop_instance` игнорирует bool `ProcessManager.stop()`; `restart_adb` использует `subprocess.run(..., check=False)` и не проверяет return code; `trigger_task` подтверждает запись scheduling intent, а не выполнение task.
 
-- `start_instance`: `ProcessManager.start()` может безопасно отклонить start при restart/cleanup/registry condition, но возвращает `None`; tool после возврата всё равно выдаёт `Success`.
-- `stop_instance`: `ProcessManager.stop()` возвращает bool, но tool игнорирует его и выдаёт `Success` после вызова, даже если manager сообщил неполную остановку.
-- `restart_adb`: оба `subprocess.run(..., check=False)` игнорируют return code, после чего выдаётся `Success`.
-- `trigger_task`: success означает запись scheduling intent, а не подтверждение выполнения task.
+**Влияние:** LLM может считать операцию завершённой, хотя она была отклонена, частично выполнена или только поставлена в план.
 
-**Impact:** LLM может принять неисполненную/частично исполненную операцию за завершённую и принять неверное следующее решение или повторить disruptive command.
+**Доказано:** current handler/result semantics.
 
-**TARGET prerequisite:** postcondition-aware command results и explicit status.
+**Не доказано:** что ложный success происходит в каждом вызове.
 
-## MCP-SEC-007 — long-running/blocking операции не имеют MCP-level timeout/dedup semantics
+**Затронуто:** MCP-T-009, T-010, T-014, T-017.
 
-**Severity:** High для R3/R4 retries; Medium для availability.
+**Обоснование severity:** неоднозначный postcondition опаснее для control plane, где client retry способен повторить disruptive action.
 
-**CURRENT FACT**
+**Целевое условие:** postcondition-aware command result с explicit accepted/running/completed/failed или эквивалентной моделью.
 
-- `restart_emulator` выполняет `time.sleep(60)` внутри `async def` между stop/start;
-- `restart_adb` использует blocking `subprocess.run` без timeout;
-- `Device.screenshot`, config I/O, log I/O и ProcessManager operations вызываются синхронно из async handlers;
-- command ID/idempotency key/dedup store отсутствуют;
-- per-tool timeout отсутствует.
+## MCP-SEC-007 — blocking/long-running operations без MCP-level timeout и dedup
 
-**Impact:** event loop может быть заблокирован; disconnect/timeout клиента не создаёт доказанного safe retry contract. Повтор restart/trigger после неопределённого результата способен повторить side effect.
+**Severity:** High для R3/R4 retry; Medium для availability.
 
-**TARGET prerequisite:** bounded operations; explicit command lifecycle/postcondition; для реально долгих действий — отдельный long-running contract. Возможность использовать современную Tasks extension можно оценить позже, но Этап 2 её не выбирает и не реализует.
+**CURRENT FACT — доказательство:** `restart_emulator` выполняет `time.sleep(60)` внутри `async def`; `restart_adb` делает blocking `subprocess.run` без timeout; screenshot/config/log/process operations вызываются синхронно; command ID/idempotency key/dedup store и per-tool timeout отсутствуют.
+
+**Влияние:** event loop может блокироваться; client disconnect/timeout не создаёт safe retry contract; повтор mutation/restart после неопределённого результата может повторить side effect.
+
+**Доказано:** отсутствие adapter-level timeout/dedup и конкретные blocking paths.
+
+**Не доказано:** фактическая wall-clock длительность каждого device/process вызова на пользовательской машине.
+
+**Затронуто:** прежде всего MCP-T-009/010/011/014/015/016/017, а также тяжёлые log reads.
+
+**Обоснование severity:** сочетание privileged side effects и неизвестного результата при timeout создаёт replay risk; blocking path дополнительно влияет на availability.
+
+**Целевое условие:** bounded/non-blocking command semantics, explicit lifecycle/postcondition и replay/idempotency policy. Выбор Tasks extension против иной command model отложен.
 
 ## MCP-SEC-008 — raw logs имеют privacy и large-output surface
 
 **Severity:** Medium.
 
-**CURRENT FACT**
+**CURRENT FACT — доказательство:** `get_recent_logs.lines` не имеет min/max; handler читает весь дневной файл через `readlines()` до slicing, возвращает raw text без MCP-level sanitization и может использовать общий fallback log. `get_current_running_task` тоже читает дневной log целиком, хотя наружу возвращает только task name.
 
-`get_recent_logs`:
+**Влияние:** memory/output pressure и потенциальное раскрытие operational identifiers, paths и error details.
 
-- принимает `lines:integer` без min/max;
-- читает весь дневной файл `readlines()` до tail slicing;
-- возвращает raw log text без MCP-level sanitization/redaction;
-- при отсутствии instance-specific файла использует общий `..._alas.txt` fallback.
+**Доказано:** full-file read, отсутствие bounds/redaction и fallback semantics.
 
-`get_current_running_task` тоже читает дневной log целиком, хотя наружу возвращает только найденное имя task.
+**Не доказано:** наличие конкретных secrets в пользовательском log.
 
-**Impact:** возможен большой memory/output cost и раскрытие operational identifiers/paths/error details из raw logs.
+**Затронуто:** MCP-T-008, частично MCP-T-012.
 
-**TARGET prerequisite:** `LogService` с bounded tail, size limits, sanitization/redaction и predictable schema.
+**Обоснование severity:** read-only capability не меняет runtime, но имеет confidentiality/DoS surface.
 
-## MCP-SEC-009 — screenshot/emulator ошибки возвращают полный traceback
+**Целевое условие:** `LogService` с bounded tail/byte limits, sanitization/redaction и predictable output schema.
+
+## MCP-SEC-009 — screenshot/emulator errors раскрывают traceback
 
 **Severity:** Medium.
 
-**CURRENT FACT**
+**CURRENT FACT — доказательство:** `get_screenshot` и `restart_emulator` включают `traceback.format_exc()` в model-facing text error.
 
-`get_screenshot` и `restart_emulator` формируют error text из `str(e)` + `traceback.format_exc()`.
+**Влияние:** раскрытие внутренних paths/device/runtime details; ошибка при этом может оставаться обычным text result.
 
-**Impact:** traceback может содержать absolute paths, device/runtime detail и внутреннюю структуру; при этом result маркируется обычным text success на MCP-level.
+**Доказано:** traceback входит в current error text.
 
-**TARGET prerequisite:** internal traceback только в server log/audit; наружу — sanitized stable error.
+**Не доказано:** наличие credentials/secrets в конкретном traceback.
 
-## MCP-SEC-010 — screenshot является high-privilege read, хотя не меняет состояние
+**Затронуто:** MCP-T-011, MCP-T-016.
 
-**Severity:** Medium-High privacy.
+**Обоснование severity:** disclosure ограничено failure path, но раскрывает внутреннюю среду и ухудшает стабильность error contract.
 
-**CURRENT FACT**
+**Целевое условие:** full traceback только в server-side diagnostics/audit; наружу — sanitized stable error.
 
-`get_screenshot` создаёт `Device(config)` и получает реальное изображение эмулятора. Результат возвращается как JPEG `ImageContent`.
+## MCP-SEC-010 — screenshot является high-privilege read
 
-**Impact:** read-only annotation в будущем не должна понижать authorization/confirmation policy: изображение может содержать приватный игровой/пользовательский контекст.
+**Severity:** Medium-High по privacy.
 
-**TARGET prerequisite:** отдельный `device:view` scope, target resolution, audit и privacy policy.
+**CURRENT FACT — доказательство:** `get_screenshot` создаёт `Device(config)`, получает реальное изображение эмулятора и возвращает JPEG `ImageContent`.
 
-## MCP-SEC-011 — `restart_adb` имеет machine-wide scope, не соответствующий `instance` argument
+**Влияние:** изображение может содержать приватный игровой/пользовательский контекст.
+
+**Доказано:** capability читает реальное device image.
+
+**Не доказано:** наличие чувствительных данных в каждом конкретном кадре.
+
+**Затронуто:** MCP-T-011.
+
+**Обоснование severity:** `readOnlyHint=true` не означает низкую привилегию для privacy-sensitive device view.
+
+**Целевое условие:** отдельный `device:view`, target resolution, audit и privacy/confirmation policy.
+
+## MCP-SEC-011 — `restart_adb` имеет machine-wide scope
 
 **Severity:** High.
 
-**CURRENT FACT**
+**CURRENT FACT — доказательство:** optional `instance` читается handler, но не ограничивает операцию; выполняется общий `adb kill-server`, затем `adb start-server`. Success output способен раскрыть фактический executable path.
 
-Tool schema допускает optional `instance`, handler присваивает его local variable, но дальше не использует для ограничения операции. Выполняется общий `adb kill-server`, затем `adb start-server`.
+**Влияние:** вызов, выглядящий instance-oriented, может прервать ADB connections шире одного AzurPilot instance.
 
-Success response включает фактический ADB executable path, который может быть absolute path пользователя.
+**Доказано:** machine-wide command construction и отсутствие instance scoping.
 
-**Impact:** вызов для одного предполагаемого экземпляра способен затронуть все ADB connections этого machine process context; path может утечь клиенту.
+**Не доказано:** конкретное воздействие на каждый сторонний процесс/device конкретной машины.
 
-**TARGET prerequisite:** отдельное product решение по machine-wide ADB control; до него capability помечена `DEFER` и не должна быть remote-exposable автоматически.
+**Затронуто:** MCP-T-017.
 
-## MCP-SEC-012 — нет actor-aware audit trail и rate limiting
+**Обоснование severity:** system-wide disruptive scope шире заявленного target и является единственным R4 tool.
+
+**Целевое условие:** отдельное product/security решение; до него capability остаётся DEFER и не считается автоматически remotely exposable.
+
+## MCP-SEC-012 — отсутствуют actor-aware audit trail и rate limiting
 
 **Severity:** Medium.
 
-**CURRENT FACT**
+**CURRENT FACT — доказательство:** MCP adapter не формирует structured successful-call audit event с actor, permission, capability, resolved target, command/correlation ID и result class. MCP-level rate limiter отсутствует.
 
-MCP adapter логирует transport events и exceptions, но успешный `call_tool` не формирует structured event с actor, permission, capability, target, request/command ID, result class и audit outcome. Rate limiter отсутствует.
+**Влияние:** слабая attributable control и защита от повторных/частых calls, особенно для screenshot/log/control/system capabilities.
 
-Без authentication actor identity сейчас в принципе не определена.
+**Доказано:** отсутствие actor-aware audit/rate-limit mechanism в MCP adapter.
 
-**TARGET prerequisite:** audit event до/после privileged command + rate limit по actor/capability/target с отдельными limits для screenshot/log/control/system operations.
+**Не доказано:** отсутствие всех технических логов внутри runtime dependencies.
 
-**OFFICIAL MCP TARGET GUIDANCE:** tools security considerations требуют access control, rate limiting, output sanitization; клиентам рекомендуется user confirmation для sensitive operations, timeout и tool-usage logging.
+**Затронуто:** все tools.
 
-## MCP-SEC-013 — semantic validation не покрывается одной JSON Schema
+**Обоснование severity:** finding сам по себе не создаёт mutation, но существенно ухудшает расследование и abuse/replay resistance privileged plane.
+
+**Целевое условие:** audit до/после privileged command + limits по actor/capability/target.
+
+## MCP-SEC-013 — protocol JSON Schema не покрывает semantic validation
 
 **Severity:** Medium-High.
 
-**CURRENT FACT**
+**CURRENT FACT — доказательство:** `mcp==1.23.0` валидирует arguments против advertised `inputSchema`, но schemas в основном ограничиваются primitive types/required fields. Они не выражают существующий instance, task existence, field-specific config rules, scheduler/process/device preconditions, machine-vs-instance scope или permission scope.
 
-SDK schema validation действительно есть, но schemas в основном проверяют только primitive types/required fields. Они не выражают:
+**Влияние:** protocol-valid input всё ещё может быть domain-invalid или иметь чрезмерный privilege target.
 
-- существующий instance target;
-- task existence/capability;
-- field-specific config rules;
-- scheduler preconditions;
-- running/stopped/device health preconditions;
-- machine-vs-instance scope;
-- permission scope.
+**Доказано:** schema validation существует, но перечисленные semantic checks не представлены текущими schemas/handlers как policy boundary.
 
-`get_task_help` unknown task возвращает `{}` как success; `trigger_task` принимает произвольный task string до `cross_set`.
+**Не доказано:** что каждый protocol-valid/domain-invalid input обязательно приводит к вредному состоянию.
 
-**TARGET prerequisite:** service-level semantic validation и safe preconditions поверх protocol schema.
+**Затронуто:** большинство tools; наиболее критично MCP-T-006/007/014/015/017.
 
-## MCP-SEC-014 — legacy session transport является migration debt, а не target security model
+**Обоснование severity:** для privileged mutations type correctness существенно слабее authorization/precondition/domain correctness.
 
-**Severity:** Medium architecture / operational.
+**Целевое условие:** service-level semantic validation и safe preconditions поверх protocol schema.
 
-**CURRENT FACT**
+## MCP-SEC-014 — legacy process-local session transport является migration debt
 
-Current transport держит UUID session → memory-stream mapping внутри одного process и требует long-lived SSE connection + POST message channel.
+**Severity:** Medium по архитектуре/эксплуатации.
+
+**CURRENT FACT — доказательство:** current `SseServerTransport` держит UUID session → memory stream mapping в одном процессе, использует long-lived SSE + message POST и теряет process-local registry при restart.
+
+**Влияние:** hidden transport state затрудняет restart/horizontal semantics и не соответствует целевому stateless protocol core.
+
+**Доказано:** current process-local session lifecycle точной зависимости `mcp==1.23.0`.
+
+**Не доказано:** необходимость сохранять compatibility с конкретными legacy clients после migration.
+
+**Затронуто:** MCP-TR-001/002 и lifecycle всех calls.
+
+**Обоснование severity:** это не самостоятельная privilege escalation, но operational debt влияет на reliability/migration design.
+
+**Целевое условие:** transport migration после/вместе с auth/policy/service boundary; не переносить hidden legacy session semantics как target invariant.
+
+**OFFICIAL MCP TARGET GUIDANCE:** опубликованная ревизия `2026-07-28` использует stateless protocol core; legacy HTTP+SSE официально deprecated. Официальный Python SDK v2 — текущая stable line, v1.x — maintenance.
+
+## Tool Annotations не являются security boundary
 
 **OFFICIAL MCP TARGET GUIDANCE**
 
-Спецификация `2026-07-28` перешла к stateless protocol core; legacy HTTP+SSE официально deprecated. Актуальный Python SDK v2 является текущей stable line и поддерживает новую ревизию.
-
-**TARGET prerequisite:** transport migration должна происходить после/вместе с auth/policy/service boundary и не должна переносить process-local legacy session semantics как архитектурный инвариант.
-
-## Tool Annotations не являются исправлением security boundary
-
-**OFFICIAL MCP TARGET GUIDANCE**
-
-`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` — только hints. Спецификация требует считать annotations недоверенными, если сам server не доверен.
+`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` — hints о семантике. Они не заменяют authentication, authorization, validation, permission policy, audit и human confirmation.
 
 **TARGET DECISION**
 
-Annotations будут добавляться только после определения реальной capability semantics, но authorization, validation, permissions, human confirmation и audit остаются отдельными обязательными механизмами.
+Будущие annotations перечислены в [целевой границе и решениях](MCP_TARGET_BOUNDARY_AND_DECISIONS.md), но security boundary остаётся server-owned.
+
+## Сверка с приёмочными полями
+
+Каждый finding выше теперь явно содержит:
+
+```text
+стабильный ID;
+summary;
+current evidence;
+impact;
+что доказано;
+что не доказано;
+affected capabilities;
+severity/risk rationale;
+target prerequisite.
+```
+
+Repository-wide discovery, `Exposed name/URI` и формальная DoD-сверка вынесены в [сверку приёмки Этапа 2](STAGE_2_ACCEPTANCE_RECONCILIATION.md).
