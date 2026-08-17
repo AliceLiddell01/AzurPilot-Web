@@ -27,9 +27,10 @@ AliceLiddell01/AzurPilot-private-Ru@3be3696975cb91ba0b85dbea98400381c3ced379
 
 - [Индекс аудита MCP](mcp/README.md) — scope, правила доказательности, counts и MCP-owned files.
 - [Текущая архитектура MCP](mcp/CURRENT_MCP_ARCHITECTURE.md) — dependency/version, embedded/standalone wiring, legacy session transport, auth/security/error flow.
-- [Матрица MCP capabilities](mcp/MCP_CAPABILITY_MATRIX.md) — 17/17 tools с inputs/outputs, side effects, dependencies, risk и evidence.
-- [Выводы по безопасности MCP](mcp/MCP_SECURITY_FINDINGS.md) — доказанные transport/capability findings и официальное target guidance.
+- [Матрица MCP capabilities](mcp/MCP_CAPABILITY_MATRIX.md) — 17/17 tools с публичным именем/URI semantics, inputs/outputs, side effects, dependencies, risk и evidence.
+- [Выводы по безопасности MCP](mcp/MCP_SECURITY_FINDINGS.md) — доказанные transport/capability findings с единым шаблоном evidence/impact/proven/unproven/severity/prerequisite.
 - [Целевая граница и решения](mcp/MCP_TARGET_BOUNDARY_AND_DECISIONS.md) — service owners, permissions, Tool Annotations, RETAIN/REDESIGN/DEFER, read-only MVP и human confirmation policy.
+- [Сверка приёмки Этапа 2](mcp/STAGE_2_ACCEPTANCE_RECONCILIATION.md) — repository-wide discovery proof, обязательные поля prompt, cross-document consistency и Definition of Done перед Ready.
 
 ## Правило доказательности
 
@@ -67,7 +68,7 @@ AzurPilot-private-Ru@3be3696975cb91ba0b85dbea98400381c3ced379:<path>::<symbol>
 ## Снимок покрытия MCP
 
 ```text
-tools: 17 / 17 classified
+tools: 17 / 17 классифицировано
 resources: 0
 resource templates: 0
 prompts: 0
@@ -75,22 +76,22 @@ completions: 0
 subscriptions: 0
 custom MCP transport path families: 2 / 2
 experimental/extensions registrations: 0
-unmapped registrations: 0
+несопоставленных registrations: 0
 ```
 
-Risk distribution:
+Распределение риска:
 
 ```text
 R0=2, R1=7, R2=0, R3=7, R4=1
 ```
 
-Migration decisions:
+Миграционные решения:
 
 ```text
 RETAIN=7, REDESIGN=9, REMOVE=0, DEFER=1
 ```
 
-Read-only MCP MVP candidate: 7 обязательных read capabilities и условный `get_recent_logs` после bounds/sanitization.
+Кандидат read-only MCP MVP: 7 обязательных read capabilities и условный `get_recent_logs` после bounds/sanitization.
 
 ## Важное предупреждение о достижимости
 
