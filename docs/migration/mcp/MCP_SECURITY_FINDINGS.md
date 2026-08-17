@@ -8,6 +8,8 @@ Severity оценивает риск capability/transport **при достиж�
 
 Современные требования MCP помечаются как **OFFICIAL MCP TARGET GUIDANCE** и не выдаются за уже реализованные свойства legacy server.
 
+Нормативные уровни официальной HTTP guidance сохраняются буквально по смыслу: validation `Origin` — **MUST**; loopback bind для локального сервера и proper authentication — **SHOULD**. Authorization в MCP как protocol feature является **OPTIONAL**; если будущий AzurPilot защищает HTTP MCP через MCP Authorization, соответствующая HTTP authorization model проектируется отдельно и не подменяется CORS, locality или Tool Annotations.
+
 ## MCP-SEC-001 — отсутствует общая authentication/authorization boundary MCP
 
 **Severity:** High при сетевой достижимости.
@@ -44,7 +46,7 @@ Severity оценивает риск capability/transport **при достиж�
 
 **Целевое условие:** secure public-edge topology, Origin/Host/trusted-proxy policy и authentication. Wildcard CORS не считать security mechanism.
 
-**OFFICIAL MCP TARGET GUIDANCE:** современная HTTP transport guidance требует Origin validation против DNS rebinding; локальным серверам рекомендуется loopback bind, remote deployments требуют proper authentication.
+**OFFICIAL MCP TARGET GUIDANCE:** современная Streamable HTTP guidance требует (`MUST`) validation `Origin` против DNS rebinding; для локального запуска рекомендует (`SHOULD`) loopback bind и рекомендует (`SHOULD`) proper authentication для соединений. Authorization как protocol feature остаётся optional, а при её использовании HTTP implementation должна следовать отдельной MCP Authorization model.
 
 ## MCP-SEC-003 — плоская privilege plane
 
@@ -276,7 +278,7 @@ Severity оценивает риск capability/transport **при достиж�
 
 ## Сверка с приёмочными полями
 
-Каждый finding выше теперь явно содержит:
+Каждый finding выше явно содержит:
 
 ```text
 стабильный ID;
