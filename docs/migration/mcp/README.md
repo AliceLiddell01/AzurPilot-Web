@@ -34,8 +34,9 @@ AliceLiddell01/AzurPilot-Web@1047f3bd9fc193ba5d69ae87db4d8342710ee3a5
 
 - [Текущая архитектура MCP](CURRENT_MCP_ARCHITECTURE.md) — production wiring, SDK/transport, embedded и standalone режимы, lifecycle, security и прямые runtime dependencies.
 - [Матрица capabilities](MCP_CAPABILITY_MATRIX.md) — полный tool-by-tool аудит, risk, validation, error/retry semantics и evidence.
-- [Выводы по безопасности](MCP_SECURITY_FINDINGS.md) — доказанные transport/capability findings с границами того, что установлено и что не установлено.
+- [Выводы по безопасности](MCP_SECURITY_FINDINGS.md) — доказанные transport/capability findings с обязательными полями доказательства, влияния, границ доказанности, severity и целевых условий.
 - [Целевая граница и решения](MCP_TARGET_BOUNDARY_AND_DECISIONS.md) — service owner, permissions, Tool Annotations, RETAIN/REDESIGN/REMOVE/DEFER, read-only MVP и confirmation policy.
+- [Сверка приёмки Этапа 2](STAGE_2_ACCEPTANCE_RECONCILIATION.md) — discovery-first completeness, явный `Exposed name/URI`, cross-document coverage и Definition of Done перед Ready.
 
 ## Проверяемое покрытие
 
@@ -66,6 +67,8 @@ unmapped registrations: 0
 
 `ProcessManager`, `AzurLaneConfig`, `Device`, `State`, config/i18n helpers и другие импортируемые модули считаются **общими backend/runtime dependencies**, а не MCP-owned кодом.
 
+Repository-wide discovery и import/wiring graph не обнаружили второго production MCP server construction, второго registration catalog или альтернативного production mount на pinned snapshot. Подробная методика и границы такого вывода записаны в сверке приёмки.
+
 ## Источники доказательств
 
 Current-state ссылки используют exact backend SHA, например:
@@ -79,7 +82,9 @@ https://github.com/AliceLiddell01/AzurPilot-private-Ru/blob/3be3696975cb91ba0b85
 - спецификация MCP `2026-07-28`: <https://modelcontextprotocol.io/specification/2026-07-28>;
 - release/deprecation context: <https://blog.modelcontextprotocol.io/posts/2026-07-28/>;
 - официальный Python SDK: <https://github.com/modelcontextprotocol/python-sdk>;
-- schema `2026-07-28`: <https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/schema/2026-07-28/schema.ts>.
+- security/support status SDK: <https://github.com/modelcontextprotocol/python-sdk/blob/main/SECURITY.md>.
+
+На момент финальной сверки Этапа 2 официальный Python SDK v2 является текущей stable line; v1.x находится в maintenance mode. Это **OFFICIAL MCP TARGET GUIDANCE**, а не описание текущего `mcp==1.23.0` в AzurPilot.
 
 ## Главная граница
 
